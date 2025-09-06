@@ -29,6 +29,8 @@ export default function LoginScreen({ navigation }) {
                 const username = userData.username; // This will be the part before @ in the email
                 
                 console.log(`User logged in: ${username} with role: ${userRole}`);
+                console.log(`succesfull`);
+
 
                 // Navigate to the correct screen based on the role
                 if (userRole === 'admin') {

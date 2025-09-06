@@ -1,0 +1,49 @@
+{
+  "name": "sport_tour",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~5.0.4",
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-native-firebase/app": "^22.0.0",
+    "@react-native-firebase/auth": "^22.0.0",
+    "@react-native-firebase/firestore": "^22.0.0",
+    "@react-navigation/bottom-tabs": "^7.3.10",
+    "@react-navigation/native": "^7.1.6",
+    "@react-navigation/stack": "^7.2.10",
+    "axios": "^1.9.0",
+    "expo": "^53.0.9",
+    "expo-blur": "~14.1.4",
+    "expo-calendar": "~14.1.4",
+    "expo-haptics": "~14.1.4",
+    "expo-linear-gradient": "~14.1.4",
+    "expo-location": "~18.1.4",
+    "expo-status-bar": "~2.2.3",
+    "firebase": "^11.6.1",
+    "formik": "^2.4.6",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-native": "0.79.2",
+    "react-native-deck-swiper": "^2.0.17",
+    "react-native-gesture-handler": "~2.24.0",
+    "react-native-maps": "1.20.1",
+    "react-native-reanimated": "^3.17.5",
+    "react-native-safe-area-context": "^5.4.0",
+    "react-native-screens": "^4.10.0",
+    "react-native-snap-carousel": "^3.9.1",
+    "react-native-svg": "^15.11.2",
+    "react-native-vector-icons": "^10.2.0",
+    "react-native-web": "^0.20.0",
+    "yup": "^1.6.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0"
+  },
+  "private": true
+}

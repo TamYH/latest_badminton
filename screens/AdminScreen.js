@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  SafeAreaView, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
   ActivityIndicator,
   TouchableOpacity
 } from 'react-native';
 import { auth, db } from '../firebase/config';
-import { 
-  collection, 
-  getDocs, 
-  query, 
-  where, 
+import {
+  collection,
+  getDocs,
+  query,
+  where,
   getCountFromServer,
   orderBy,
   limit
@@ -23,6 +23,8 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import TeamScreen from './TeamScreen';
 import VenueScreen from './VenueScreen';
 import RollerWheel from './RollerWheel';
+import EliminationScreen from './EliminationScreen';
+import CreateTourScreen from './CreateTourScreen';
 
 function StatisticsScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
@@ -44,37 +46,37 @@ function StatisticsScreen({ navigation }) {
   const fetchStatistics = async () => {
     try {
       setLoading(true);
-      
+
       // Get user count
       const usersQuery = query(collection(db, 'users'), where('role', '==', 'user'));
       const usersSnapshot = await getCountFromServer(usersQuery);
       const userCount = usersSnapshot.data().count;
-      
+
       // Get team count
       const teamsQuery = query(collection(db, 'teams'));
       const teamsSnapshot = await getCountFromServer(teamsQuery);
       const teamCount = teamsSnapshot.data().count;
-      
+
       // Get venue count
       const venuesQuery = query(collection(db, 'venues'));
       const venuesSnapshot = await getCountFromServer(venuesQuery);
       const venueCount = venuesSnapshot.data().count;
-      
+
       // Get tournament statistics
       const tournamentsQuery = query(collection(db, 'tournaments'));
       const tournamentsSnapshot = await getDocs(tournamentsQuery);
       const tournamentCount = tournamentsSnapshot.size;
-      
+
       // Process tournament data for more stats
       let completedTournaments = 0;
       let totalMatches = 0;
-      
+
       tournamentsSnapshot.forEach(doc => {
         const data = doc.data();
         if (data.completed) completedTournaments++;
         if (data.matchups) totalMatches += data.matchups.length;
       });
-      
+
       // Get recent tournaments (last 5)
       const recentTournamentsQuery = query(
         collection(db, 'tournaments'),
@@ -107,7 +109,7 @@ function StatisticsScreen({ navigation }) {
           });
         }
       });
-      
+
       // Sort teams by wins and get top 5
       const topTeams = Object.entries(teamWins)
         .sort((a, b) => b[1] - a[1])
@@ -145,8 +147,16 @@ function StatisticsScreen({ navigation }) {
   // Render the statistics dashboard
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.header}>Admin Dashboard</Text>
-      
+      <View style={styles.headerContainer}>
+        <Text style={styles.header}>Admin Dashboard</Text>
+        <TouchableOpacity 
+          style={styles.createButton}
+          onPress={() => navigation.navigate('Create Tour')}
+        >
+          <Ionicons name="trophy-outline" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView style={styles.scrollView}>
         {/* Summary Cards */}
         <View style={styles.cardsContainer}>
@@ -154,23 +164,23 @@ function StatisticsScreen({ navigation }) {
             <Text style={styles.statValue}>{stats.users}</Text>
             <Text style={styles.statLabel}>Users</Text>
           </View>
-          
+
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats.teams}</Text>
             <Text style={styles.statLabel}>Teams</Text>
           </View>
-          
+
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats.venues}</Text>
             <Text style={styles.statLabel}>Venues</Text>
           </View>
-          
+
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats.tournaments}</Text>
             <Text style={styles.statLabel}>Tournaments</Text>
           </View>
         </View>
-        
+
         {/* Tournament Statistics */}
         <View style={styles.section}>
           <Text style={styles.sectionHeader}>Tournament Stats</Text>
@@ -186,21 +196,21 @@ function StatisticsScreen({ navigation }) {
             <View style={styles.statRow}>
               <Text style={styles.statTitle}>Completion Rate:</Text>
               <Text style={styles.statInfo}>
-                {stats.tournaments > 0 
-                  ? `${Math.round((stats.completedTournaments / stats.tournaments) * 100)}%` 
+                {stats.tournaments > 0
+                  ? `${Math.round((stats.completedTournaments / stats.tournaments) * 100)}%`
                   : 'N/A'}
               </Text>
             </View>
           </View>
         </View>
-        
+
         {/* Recent Tournaments */}
         <View style={styles.section}>
           <Text style={styles.sectionHeader}>Recent Tournaments</Text>
           {stats.recentTournaments.length > 0 ? (
             <View style={styles.sectionContent}>
               {stats.recentTournaments.map((tournament, index) => (
-                <TouchableOpacity 
+                <TouchableOpacity
                   key={tournament.id}
                   style={styles.tournamentItem}
                   onPress={() => navigation.navigate('TournamentView', { tournamentId: tournament.id })}
@@ -212,7 +222,7 @@ function StatisticsScreen({ navigation }) {
                     </Text>
                     <Text style={[
                       styles.tournamentStatus,
-                      {color: tournament.completed ? '#28a745' : '#007bff'}
+                      { color: tournament.completed ? '#28a745' : '#007bff' }
                     ]}>
                       {tournament.completed ? 'Completed' : 'In Progress'}
                     </Text>
@@ -224,7 +234,7 @@ function StatisticsScreen({ navigation }) {
             <Text style={styles.emptyText}>No recent tournaments</Text>
           )}
         </View>
-        
+
         {/* Top Teams */}
         <View style={styles.section}>
           <Text style={styles.sectionHeader}>Top Teams (by Wins)</Text>
@@ -243,7 +253,7 @@ function StatisticsScreen({ navigation }) {
           )}
         </View>
       </ScrollView>
-      
+
       <TouchableOpacity
         style={styles.refreshButton}
         onPress={fetchStatistics}
@@ -275,8 +285,14 @@ export default function AdminScreen({ navigation }) {
             case 'Team':
               iconName = 'people-outline';
               break;
+            case 'Elimination':
+              iconName = 'trash-outline';  // or 'close-circle-outline' for a different icon
+              break;
             case 'Venues':
               iconName = 'location-outline';
+              break;
+            case 'Create Tour':
+              iconName = 'trophy-outline';
               break;
             case 'RollerWheel':
               iconName = 'cog-outline';
@@ -299,6 +315,9 @@ export default function AdminScreen({ navigation }) {
       <Tab.Screen name="Team" component={TeamScreen} />
       <Tab.Screen name="Venues" component={VenueScreen} />
       <Tab.Screen name="RollerWheel" component={RollerWheel} />
+      <Tab.Screen name="Elimination" component={EliminationScreen} />
+      <Tab.Screen name="Create Tour" component={CreateTourScreen} />
+
       <Tab.Screen
         name="Logout"
         component={LogoutScreen}
@@ -315,11 +334,11 @@ export default function AdminScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    paddingHorizontal: 16, 
-    paddingTop: 16, 
-    backgroundColor: '#f5f5f5' 
+  container: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    backgroundColor: '#f5f5f5'
   },
   loadingContainer: {
     flex: 1,
@@ -332,12 +351,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333'
   },
-  header: { 
-    fontSize: 28, 
-    fontWeight: 'bold',
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
+    position: 'relative',
+  },
+  header: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
     textAlign: 'center',
-    color: '#333'
+  },
+  createButton: {
+    position: 'absolute',
+    right: 15,
+    backgroundColor: '#007aff',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   scrollView: {
     flex: 1

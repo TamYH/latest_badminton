@@ -13,7 +13,8 @@ import TeamScreen from './screens/TeamScreen';
 import TournamentView from './screens/TournamentView';
 import UserTeamView from './screens/UserTeamView';
 import UserTournamentView from './screens/UserTournamentView';
-
+import EliminationScreen from './screens/EliminationScreen';
+import CreateTourScreen from './screens/CreateTourScreen';
 const Stack = createStackNavigator();
 
 export default function App() {
@@ -31,6 +32,8 @@ export default function App() {
         <Stack.Screen name="VenueScreen" component={VenueScreen} />
         <Stack.Screen name="RollerWheel" component={RollerWheel} />
         <Stack.Screen name="TeamScreen" component={TeamScreen} />
+        <Stack.Screen name="EliminationScreen" component={EliminationScreen} />
+        <Stack.Screen name="CreateTour" component={CreateTourScreen} />
         <Stack.Screen name="TournamentView" component={TournamentView} />
         <Stack.Screen name="UserTeamView" component={UserTeamView} />
         <Stack.Screen name="UserTournamentView" component={UserTournamentView} />

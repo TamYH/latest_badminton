@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  FlatList, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
   ActivityIndicator,
   Alert,
   Modal,
@@ -12,16 +12,18 @@ import {
   TextInput
 } from 'react-native';
 import { db } from '../firebase/config';
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  getDoc, 
-  updateDoc, 
-  query, 
+import {
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+  updateDoc,
+  query,
   orderBy,
   deleteDoc
 } from 'firebase/firestore';
+import ResultsModal from '../modals/ResultsModal';
+
 
 const TournamentView = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
@@ -32,9 +34,12 @@ const TournamentView = ({ route, navigation }) => {
   const [timeModalVisible, setTimeModalVisible] = useState(false);
   const [matchupTime, setMatchupTime] = useState('');
   const [deleteConfirmModalVisible, setDeleteConfirmModalVisible] = useState(false);
+const [resultsModalVisible, setResultsModalVisible] = useState(false);
+
 
   // Check if a specific tournament was requested
   const tournamentId = route.params?.tournamentId;
+
 
   useEffect(() => {
     if (tournamentId) {
@@ -46,11 +51,13 @@ const TournamentView = ({ route, navigation }) => {
     }
   }, [tournamentId]);
 
+
   const loadSingleTournament = async (id) => {
     try {
       setLoading(true);
       const tournamentDoc = await getDoc(doc(db, 'tournaments', id));
-      
+
+
       if (tournamentDoc.exists()) {
         const data = tournamentDoc.data();
         setSelectedTournament({
@@ -70,16 +77,19 @@ const TournamentView = ({ route, navigation }) => {
     }
   };
 
+
   const loadTournaments = async () => {
     try {
       setLoading(true);
       const tournamentsQuery = query(
-        collection(db, 'tournaments'), 
+        collection(db, 'tournaments'),
         orderBy('createdAt', 'desc')
       );
-      
+
+
       const querySnapshot = await getDocs(tournamentsQuery);
-      
+
+
       const tournamentsList = querySnapshot.docs.map(doc => {
         const data = doc.data();
         return {
@@ -92,7 +102,8 @@ const TournamentView = ({ route, navigation }) => {
           matchCount: data.matchups?.length || 0
         };
       });
-      
+
+
       setTournaments(tournamentsList);
     } catch (error) {
       console.error("Error loading tournaments:", error);
@@ -102,11 +113,13 @@ const TournamentView = ({ route, navigation }) => {
     }
   };
 
+
   const handleTournamentSelect = async (tournamentId) => {
     try {
       setLoading(true);
       const tournamentDoc = await getDoc(doc(db, 'tournaments', tournamentId));
-      
+
+
       if (tournamentDoc.exists()) {
         const data = tournamentDoc.data();
         setSelectedTournament({
@@ -125,15 +138,18 @@ const TournamentView = ({ route, navigation }) => {
     }
   };
 
+
   const handleBackToList = () => {
     setSelectedTournament(null);
     loadTournaments(); // Refresh the list when going back
   };
 
+
   const openMatchupModal = (matchup) => {
     setSelectedMatchup(matchup);
     setModalVisible(true);
   };
+
 
   const openTimeModal = () => {
     setModalVisible(false);
@@ -141,107 +157,325 @@ const TournamentView = ({ route, navigation }) => {
     setTimeModalVisible(true);
   };
 
-  const saveMatchupTime = async () => {
-    if (!selectedMatchup || !selectedTournament) return;
-    
-    try {
-      setTimeModalVisible(false);
-      setLoading(true);
-      
-      // Find index of the matchup in the array
-      const matchupIndex = selectedTournament.matchups.findIndex(
-        m => m.team1Id === selectedMatchup.team1Id && 
-             m.team2Id === selectedMatchup.team2Id &&
-             m.round === selectedMatchup.round
-      );
-      
-      if (matchupIndex === -1) {
-        throw new Error("Matchup not found");
-      }
-      
-      // Create updated matchups array
-      const updatedMatchups = [...selectedTournament.matchups];
-      updatedMatchups[matchupIndex] = {
-        ...updatedMatchups[matchupIndex],
-        matchupTime: matchupTime
-      };
-      
-      // Update document in Firestore
-      const tournamentRef = doc(db, 'tournaments', selectedTournament.id);
-      await updateDoc(tournamentRef, {
-        matchups: updatedMatchups
-      });
-      
-      // Refresh the tournament data
-      await loadSingleTournament(selectedTournament.id);
-      
-      Alert.alert("Success", "Match time updated successfully");
-    } catch (error) {
-      console.error("Error updating matchup time:", error);
-      Alert.alert("Error", "Failed to update matchup time");
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const updateMatchupWinner = async (winner) => {
-    if (!selectedMatchup || !selectedTournament) return;
-    
-    try {
-      setModalVisible(false);
-      setLoading(true);
-      
-      // Find index of the matchup in the array
-      const matchupIndex = selectedTournament.matchups.findIndex(
-        m => m.team1Id === selectedMatchup.team1Id && 
-             m.team2Id === selectedMatchup.team2Id &&
-             m.round === selectedMatchup.round
-      );
-      
-      if (matchupIndex === -1) {
-        throw new Error("Matchup not found");
-      }
-      
-      // Create updated matchups array
-      const updatedMatchups = [...selectedTournament.matchups];
-      updatedMatchups[matchupIndex] = {
-        ...updatedMatchups[matchupIndex],
-        winner: winner,
-        completed: true
-      };
-      
-      // Update document in Firestore
-      const tournamentRef = doc(db, 'tournaments', selectedTournament.id);
-      await updateDoc(tournamentRef, {
-        matchups: updatedMatchups
-      });
-      
-      // Refresh the tournament data
-      await loadSingleTournament(selectedTournament.id);
-      
-      Alert.alert("Success", "Winner updated successfully");
-    } catch (error) {
-      console.error("Error updating matchup:", error);
-      Alert.alert("Error", "Failed to update matchup");
-    } finally {
-      setLoading(false);
-      setSelectedMatchup(null);
+ 
+
+
+ 
+const updateMatchupWinner = async (winner) => {
+  if (!selectedMatchup || !selectedTournament) return;
+
+
+  try {
+    setModalVisible(false);
+    setLoading(true);
+
+
+    // Find the EXACT matchup by including matchNumber
+    const matchupIndex = selectedTournament.matchups.findIndex(
+      m => m.team1Id === selectedMatchup.team1Id &&
+        m.team2Id === selectedMatchup.team2Id &&
+        m.round === selectedMatchup.round &&
+        m.matchNumber === selectedMatchup.matchNumber
+    );
+
+
+    if (matchupIndex === -1) {
+      throw new Error("Matchup not found");
     }
-  };
+
+
+    // Create updated matchups array
+    const updatedMatchups = [...selectedTournament.matchups];
+    updatedMatchups[matchupIndex] = {
+      ...updatedMatchups[matchupIndex],
+      winner: winner,
+      completed: true
+    };
+
+
+    // Update document in Firestore
+    const tournamentRef = doc(db, 'tournaments', selectedTournament.id);
+    await updateDoc(tournamentRef, {
+      matchups: updatedMatchups
+    });
+
+
+    // Check if this is an elimination tournament and if the current round is complete
+    if (selectedTournament.type === 'elimination') {
+      const currentRound = selectedMatchup.round;
+      const currentRoundMatches = updatedMatchups.filter(m => m.round === currentRound);
+      const completedCurrentRoundMatches = currentRoundMatches.filter(m => m.completed);
+
+
+      // If all matches in current round are complete, generate next round
+      if (currentRoundMatches.length === completedCurrentRoundMatches.length && currentRoundMatches.length > 0) {
+        // Get winners from current round
+        const winners = completedCurrentRoundMatches.map(match => {
+          // Use team names from the matchup itself instead of looking up teams
+          return {
+            id: match.winner,
+            name: match.winner === match.team1Id ? match.team1Name : match.team2Name
+          };
+        });
+
+
+        // Check if we have a champion (only 1 winner left)
+        if (winners.length === 1) {
+          Alert.alert(
+            "🏆 CHAMPION! 🏆",
+            `${winners[0].name} is the tournament champion!`,
+            [
+              {
+                text: "View Results",
+                onPress: () => setResultsModalVisible(true)
+              },
+              {
+                text: "OK",
+                style: "default"
+              }
+            ]
+          );
+
+
+          // Mark tournament as completed
+          await updateDoc(tournamentRef, {
+            completed: true,
+            champion: winners[0].id,
+            championName: winners[0].name
+          });
+
+
+        } else if (winners.length > 1) {
+          // Generate next round matches
+          await generateNextRoundMatches(currentRound, winners);
+        }
+      }
+    }
+
+
+    // Update local state
+    setSelectedTournament(prev => ({
+      ...prev,
+      matchups: updatedMatchups
+    }));
+
+
+    // Check if all matches are completed
+    const allMatchesCompleted = updatedMatchups.every(m => m.completed === true);
+
+    // If all matches are complete, update tournament status
+    if (allMatchesCompleted) {
+      let champion = null;
+      
+      if (selectedTournament.type !== 'elimination') {
+        // For round robin, determine champion based on points
+        const teams = selectedTournament.teams || selectedTournament.players;
+        const teamStats = {};
+        
+        // Initialize team stats
+        teams.forEach(team => {
+          teamStats[team.id] = {
+            id: team.id,
+            name: team.name,
+            wins: 0,
+            points: 0
+          };
+        });
+        
+        // Count wins and calculate points
+        updatedMatchups.forEach(match => {
+          if (match.completed && match.winner) {
+            teamStats[match.winner].wins += 1;
+            teamStats[match.winner].points += 2;
+          }
+        });
+        
+        // Find team with most points
+        let maxPoints = -1;
+        let championId = null;
+        
+        Object.values(teamStats).forEach(team => {
+          if (team.points > maxPoints) {
+            maxPoints = team.points;
+            championId = team.id;
+            champion = team;
+          }
+        });
+        
+        // Update document in Firestore to mark as completed
+        await updateDoc(tournamentRef, {
+          completed: true,
+          champion: champion.id,
+          championName: champion.name
+        });
+        
+        // Update local state
+        setSelectedTournament(prev => ({
+          ...prev,
+          completed: true,
+          champion: champion.id,
+          championName: champion.name
+        }));
+        
+        Alert.alert(
+          "🏆 CHAMPION! 🏆",
+          `${champion.name} is the tournament champion!`,
+          [
+            {
+              text: "View Results",
+              onPress: () => setResultsModalVisible(true)
+            },
+            {
+              text: "OK",
+              style: "default"
+            }
+          ]
+        );
+      }
+    }
+
+
+    Alert.alert("Success", "Winner updated successfully");
+  } catch (error) {
+    console.error("Error updating matchup:", error);
+    Alert.alert("Error", "Failed to update matchup");
+  } finally {
+    setLoading(false);
+    setSelectedMatchup(null);
+  }
+};
+
+
+
+
+const generateNextRoundMatches = async (currentRound, winners) => {
+  if (winners.length < 2) return; // Need at least 2 winners to create next round
+
+
+  const nextRound = currentRound + 1;
+  const nextRoundMatches = [];
+
+
+  // Pair up winners for next round
+  for (let i = 0; i < winners.length; i += 2) {
+    if (i + 1 < winners.length) {
+      const team1 = winners[i];
+      const team2 = winners[i + 1];
+     
+      nextRoundMatches.push({
+        round: nextRound,
+        team1Id: team1.id,
+        team2Id: team2.id,
+        team1Name: team1.name,
+        team2Name: team2.name,
+        matchNumber: Math.floor(i / 2) + 1,
+        completed: false,
+        winner: null,
+        matchupTime: null
+      });
+    }
+  }
+
+
+  if (nextRoundMatches.length > 0) {
+    // Add next round matches to the tournament
+    const updatedMatchups = [...selectedTournament.matchups, ...nextRoundMatches];
+   
+    const tournamentRef = doc(db, 'tournaments', selectedTournament.id);
+    await updateDoc(tournamentRef, {
+      matchups: updatedMatchups,
+      currentRound: nextRound
+    });
+
+
+    // Update local state
+    setSelectedTournament(prev => ({
+      ...prev,
+      matchups: updatedMatchups,
+      currentRound: nextRound
+    }));
+
+
+    Alert.alert(
+      "Round Advanced!",
+      `Round ${nextRound} matches have been created with the winners from Round ${currentRound}.`
+    );
+  }
+};
+
+
+// Also update the saveMatchupTime function to use the same logic:
+const saveMatchupTime = async () => {
+  if (!selectedMatchup || !selectedTournament) return;
+
+
+  try {
+    setTimeModalVisible(false);
+    setLoading(true);
+
+
+    // Find the EXACT matchup by including matchNumber
+    const matchupIndex = selectedTournament.matchups.findIndex(
+      m => m.team1Id === selectedMatchup.team1Id &&
+        m.team2Id === selectedMatchup.team2Id &&
+        m.round === selectedMatchup.round &&
+        m.matchNumber === selectedMatchup.matchNumber // Add this line
+    );
+
+
+    if (matchupIndex === -1) {
+      throw new Error("Matchup not found");
+    }
+
+
+    // Create updated matchups array
+    const updatedMatchups = [...selectedTournament.matchups];
+    updatedMatchups[matchupIndex] = {
+      ...updatedMatchups[matchupIndex],
+      matchupTime: matchupTime
+    };
+
+
+    // Update document in Firestore
+    const tournamentRef = doc(db, 'tournaments', selectedTournament.id);
+    await updateDoc(tournamentRef, {
+      matchups: updatedMatchups
+    });
+
+
+    // Refresh the tournament data
+    await loadSingleTournament(selectedTournament.id);
+
+
+    Alert.alert("Success", "Match time updated successfully");
+  } catch (error) {
+    console.error("Error updating matchup time:", error);
+    Alert.alert("Error", "Failed to update matchup time");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
 
   // New function to delete a tournament
   const deleteTournament = async () => {
     if (!selectedTournament) return;
-    
+
+
     try {
       setDeleteConfirmModalVisible(false);
       setLoading(true);
-      
+
+
       // Delete the tournament document from Firestore
       await deleteDoc(doc(db, 'tournaments', selectedTournament.id));
-      
+
+
       Alert.alert(
-        "Success", 
+        "Success",
         "Tournament deleted successfully",
         [{ text: "OK", onPress: handleBackToList }]
       );
@@ -252,15 +486,16 @@ const TournamentView = ({ route, navigation }) => {
     }
   };
 
+
   // Render tournament list
   const renderTournamentItem = ({ item }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.tournamentItem}
       onPress={() => handleTournamentSelect(item.id)}
     >
       <Text style={styles.tournamentName}>{item.name}</Text>
       <Text style={styles.tournamentDetails}>
-        Teams: {item.totalTeams} • Matches: {item.matchCount} • 
+        Teams: {item.totalTeams} • Matches: {item.matchCount} •
         Created: {item.createdAt.toLocaleDateString()}
       </Text>
       <Text style={[
@@ -272,47 +507,113 @@ const TournamentView = ({ route, navigation }) => {
     </TouchableOpacity>
   );
 
+
   // Render matchup item
-  const renderMatchupItem = ({ item, index }) => (
-    <TouchableOpacity 
-      style={[
-        styles.matchupItem,
-        item.completed && styles.completedMatchup
-      ]}
-      onPress={() => openMatchupModal(item)}
-    >
-      <Text style={styles.matchupTitle}>Round {item.round} - Match {index + 1}</Text>
-      <View style={styles.teamsContainer}>
-        <Text 
-          style={[
-            styles.teamName, 
-            item.winner === item.team1Id && styles.winnerTeam
-          ]}
-        >
-          {item.team1Name}
-        </Text>
-        <Text style={styles.vsText}>vs</Text>
-        <Text 
-          style={[
-            styles.teamName, 
-            item.winner === item.team2Id && styles.winnerTeam
-          ]}
-        >
-          {item.team2Name}
-        </Text>
-      </View>
-      {item.matchupTime && (
-        <Text style={styles.matchupTimeText}>
-          Match Time: {item.matchupTime}
-        </Text>
-      )}
-      {item.completed && (
-        <Text style={styles.winnerText}>
-          Winner: {item.winner === item.team1Id ? item.team1Name : item.team2Name}
-        </Text>
-      )}
-    </TouchableOpacity>
-  );
+  const renderMatchupItem = ({ item, index }) => {
+    // Extract player names based on matchNumber in round robin tournaments
+    let player1Name = item.team1Name;
+    let player2Name = item.team2Name;
+
+
+    // For round robin tournaments, get individual player names
+    if (selectedTournament.type === 'roundrobin' && item.matchNumber) {
+      // These would be the individual player matchups
+      if (item.player1Name && item.player2Name) {
+        player1Name = item.player1Name;
+        player2Name = item.player2Name;
+      } else {
+        // If player names aren't directly stored, construct from team members
+        // This assumes team members are stored in order by position
+        const team1 = selectedTournament.teams?.find(t => t.id === item.team1Id);
+        const team2 = selectedTournament.teams?.find(t => t.id === item.team2Id);
+
+
+        if (team1 && team2 && team1.memberIds && team2.memberIds) {
+          // Match number (1-5) corresponds to player position in team (0-4)
+          const playerIndex = (item.matchNumber - 1) % 5;
+          // Try to get player names from memberIds array if available
+          const memberId1 = team1.memberIds[playerIndex];
+          const memberId2 = team2.memberIds[playerIndex];
+
+
+          // If we have email-like memberIds (as shown in your Firebase), extract name part
+          if (memberId1 && memberId1.includes('_gmail_com')) {
+            player1Name = memberId1.split('_gmail_com')[0].replace(/^"/, '');
+          }
+
+
+          if (memberId2 && memberId2.includes('_gmail_com')) {
+            player2Name = memberId2.split('_gmail_com')[0].replace(/^"/, '');
+          }
+        }
+      }
+    }
+
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.matchupItem,
+          item.completed && styles.completedMatchup
+        ]}
+        onPress={() => openMatchupModal(item)}
+      >
+        <Text style={styles.matchupTitle}>Round {item.round} - Match {index + 1}</Text>
+
+
+        {/* Show team names as context */}
+        <View style={styles.teamsContainer}>
+          <Text style={styles.teamLabel}>{item.team1Name}</Text>
+          <Text style={styles.vsText}>vs</Text>
+          <Text style={styles.teamLabel}>{item.team2Name}</Text>
+        </View>
+
+
+        {/* Show the actual player matchup */}
+        <View style={styles.playerMatchupContainer}>
+          <Text style={styles.playerMatchupLabel}>
+            {selectedTournament.type === 'roundrobin' ? `Player Match ${item.matchNumber || index + 1}` : 'Match'}
+          </Text>
+          <View style={styles.playerMatchupRow}>
+            <Text
+              style={[
+                styles.playerName,
+                item.winner === item.team1Id && styles.winnerPlayer
+              ]}
+            >
+              {player1Name}
+            </Text>
+            <Text style={styles.vsTextSmall}>vs</Text>
+            <Text
+              style={[
+                styles.playerName,
+                item.winner === item.team2Id && styles.winnerPlayer
+              ]}
+            >
+              {player2Name}
+            </Text>
+          </View>
+        </View>
+
+
+        {item.matchupTime && (
+          <Text style={styles.matchupTimeText}>
+            Match Time: {item.matchupTime}
+          </Text>
+        )}
+
+
+        {item.completed && (
+          <Text style={styles.winnerText}>
+            Winner: {item.winner === item.team1Id ? player1Name : player2Name}
+          </Text>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+
+
 
   // Loading indicator
   if (loading) {
@@ -324,13 +625,15 @@ const TournamentView = ({ route, navigation }) => {
     );
   }
 
+
   // Tournament list view
   if (!selectedTournament) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           <Text style={styles.title}>Tournaments</Text>
-          
+
+
           {tournaments.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No tournaments found</Text>
@@ -349,7 +652,8 @@ const TournamentView = ({ route, navigation }) => {
               contentContainerStyle={styles.listContent}
             />
           )}
-          
+
+
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
@@ -361,17 +665,39 @@ const TournamentView = ({ route, navigation }) => {
     );
   }
 
+
   // Tournament detail view
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <View style={styles.tournamentHeader}>
-          <Text style={styles.tournamentHeaderTitle}>{selectedTournament.name}</Text>
-          <Text style={styles.tournamentHeaderDetails}>
-            Created: {selectedTournament.createdAt.toLocaleDateString()}
-          </Text>
-        </View>
-        
+       <View style={styles.tournamentHeader}>
+  <View style={styles.tournamentHeaderContent}>
+    <Text style={styles.tournamentHeaderTitle}>{selectedTournament.name}</Text>
+    <Text style={styles.tournamentHeaderDetails}>
+      Created: {selectedTournament.createdAt.toLocaleDateString()}
+    </Text>
+    <Text style={styles.tournamentType}>Type: {selectedTournament.type === 'roundrobin' ? 'Round Robin' : 'Elimination'}</Text>
+  </View>
+ 
+  {/* Results Button */}
+
+
+    <TouchableOpacity
+      style={styles.resultsButton}
+      onPress={() => setResultsModalVisible(true)}
+    >
+      <Text style={styles.resultsButtonText}>Results</Text>
+    </TouchableOpacity>
+ 
+</View>
+
+
+
+
+
+
+
+
         <FlatList
           data={selectedTournament.matchups}
           renderItem={renderMatchupItem}
@@ -386,7 +712,8 @@ const TournamentView = ({ route, navigation }) => {
             <Text style={styles.emptyText}>No matchups found for this tournament</Text>
           }
         />
-        
+
+
         <View style={styles.buttonRow}>
           <TouchableOpacity
             style={styles.backToListButton}
@@ -394,14 +721,16 @@ const TournamentView = ({ route, navigation }) => {
           >
             <Text style={styles.backToListButtonText}>Back to List</Text>
           </TouchableOpacity>
-          
+
+
           <TouchableOpacity
             style={styles.deleteButton}
             onPress={() => setDeleteConfirmModalVisible(true)}
           >
             <Text style={styles.deleteButtonText}>Delete</Text>
           </TouchableOpacity>
-          
+
+
           <TouchableOpacity
             style={styles.exitButton}
             onPress={() => navigation.goBack()}
@@ -409,6 +738,7 @@ const TournamentView = ({ route, navigation }) => {
             <Text style={styles.exitButtonText}>Exit</Text>
           </TouchableOpacity>
         </View>
+
 
         {/* Winner Selection Modal */}
         <Modal
@@ -420,13 +750,15 @@ const TournamentView = ({ route, navigation }) => {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Select Winner</Text>
-              
+
+
               {selectedMatchup && (
                 <>
                   <Text style={styles.modalMatchupTitle}>
                     Round {selectedMatchup.round} Matchup
                   </Text>
-                  
+
+
                   <TouchableOpacity
                     style={[
                       styles.winnerButton,
@@ -436,7 +768,8 @@ const TournamentView = ({ route, navigation }) => {
                   >
                     <Text style={styles.winnerButtonText}>{selectedMatchup.team1Name}</Text>
                   </TouchableOpacity>
-                  
+
+
                   <TouchableOpacity
                     style={[
                       styles.winnerButton,
@@ -446,7 +779,8 @@ const TournamentView = ({ route, navigation }) => {
                   >
                     <Text style={styles.winnerButtonText}>{selectedMatchup.team2Name}</Text>
                   </TouchableOpacity>
-                  
+
+
                   <TouchableOpacity
                     style={styles.timeButton}
                     onPress={openTimeModal}
@@ -455,7 +789,8 @@ const TournamentView = ({ route, navigation }) => {
                       {selectedMatchup.matchupTime ? 'Update Match Time' : 'Add Match Time'}
                     </Text>
                   </TouchableOpacity>
-                  
+
+
                   <TouchableOpacity
                     style={styles.cancelButton}
                     onPress={() => setModalVisible(false)}
@@ -468,6 +803,7 @@ const TournamentView = ({ route, navigation }) => {
           </View>
         </Modal>
 
+
         {/* Time Entry Modal */}
         <Modal
           animationType="slide"
@@ -478,13 +814,15 @@ const TournamentView = ({ route, navigation }) => {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Match Time</Text>
-              
+
+
               {selectedMatchup && (
                 <>
                   <Text style={styles.modalMatchupTitle}>
                     {selectedMatchup.team1Name} vs {selectedMatchup.team2Name}
                   </Text>
-                  
+
+
                   <TextInput
                     style={styles.timeInput}
                     value={matchupTime}
@@ -492,7 +830,8 @@ const TournamentView = ({ route, navigation }) => {
                     placeholder="Enter match time (e.g., 3:30 PM)"
                     placeholderTextColor="#aaa"
                   />
-                  
+
+
                   <View style={styles.timeModalButtons}>
                     <TouchableOpacity
                       style={styles.saveTimeButton}
@@ -500,7 +839,8 @@ const TournamentView = ({ route, navigation }) => {
                     >
                       <Text style={styles.saveTimeButtonText}>Save</Text>
                     </TouchableOpacity>
-                    
+
+
                     <TouchableOpacity
                       style={styles.cancelTimeButton}
                       onPress={() => {
@@ -517,6 +857,7 @@ const TournamentView = ({ route, navigation }) => {
           </View>
         </Modal>
 
+
         {/* Delete Confirmation Modal */}
         <Modal
           animationType="slide"
@@ -530,7 +871,8 @@ const TournamentView = ({ route, navigation }) => {
               <Text style={styles.deleteConfirmText}>
                 Are you sure you want to delete "{selectedTournament.name}"? This action cannot be undone.
               </Text>
-              
+
+
               <View style={styles.deleteModalButtons}>
                 <TouchableOpacity
                   style={styles.deleteConfirmButton}
@@ -538,7 +880,8 @@ const TournamentView = ({ route, navigation }) => {
                 >
                   <Text style={styles.deleteConfirmButtonText}>Delete</Text>
                 </TouchableOpacity>
-                
+
+
                 <TouchableOpacity
                   style={styles.cancelDeleteButton}
                   onPress={() => setDeleteConfirmModalVisible(false)}
@@ -550,10 +893,18 @@ const TournamentView = ({ route, navigation }) => {
           </View>
         </Modal>
       </View>
+      <ResultsModal
+  visible={resultsModalVisible}
+  onClose={() => setResultsModalVisible(false)}
+  tournament={selectedTournament}
+/>
+
+
     </SafeAreaView>
   );
 };
-    
+
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -628,7 +979,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#007bff',
     borderRadius: 8,
     padding: 16,
-    marginBottom: 16
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center'
   },
   tournamentHeaderTitle: {
     fontSize: 35,
@@ -769,7 +1122,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     flex: 1
   },
-  exitButtonText:{
+  exitButtonText: {
     color: 'white',
     fontSize: 25,
     fontWeight: '500',
@@ -930,7 +1283,108 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     color: '#6c757d'
-  }
+  },
+
+
+  tournamentType: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  playerMatchupContainer: {
+    marginTop: 8,
+    backgroundColor: '#f1f8ff',
+    padding: 8,
+    borderRadius: 6,
+    borderLeftWidth: 2,
+    borderLeftColor: '#007bff',
+  },
+  playerMatchupLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#0056b3',
+    marginBottom: 4,
+  },
+  playerMatchupText: {
+    fontSize: 14,
+    color: '#0056b3',
+  },
+  teamLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+    flex: 1,
+  },
+  playerMatchupContainer: {
+    marginTop: 8,
+    backgroundColor: '#f1f8ff',
+    padding: 10,
+    borderRadius: 6,
+    borderLeftWidth: 2,
+    borderLeftColor: '#007bff',
+  },
+  playerMatchupLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#0056b3',
+    marginBottom: 4,
+  },
+  playerMatchupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  playerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    flex: 1,
+  },
+  vsTextSmall: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#dc3545',
+    marginHorizontal: 8,
+  },
+  winnerPlayer: {
+    color: '#28a745',
+    fontWeight: 'bold',
+  },
+
+
+tournamentHeaderContent: {
+  flex: 1,
+},
+resultsButton: {
+  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  borderRadius: 8,
+  paddingVertical: 5,
+  paddingHorizontal: 20
+ 
+  ,
+  borderWidth: 1,
+  borderColor: 'rgba(255, 255, 255, 0.3)',
+  marginLeft: 1,
+},
+resultsButtonText: {
+  color: 'white',
+  fontSize: 18,
+  fontWeight: 'bold',
+  textAlign: 'center',
+},
+
+
+
+
 });
 
+
 export default TournamentView;
+
+

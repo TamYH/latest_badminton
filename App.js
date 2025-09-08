@@ -33,7 +33,7 @@ export default function App() {
         <Stack.Screen name="RollerWheel" component={RollerWheel} />
         <Stack.Screen name="TeamScreen" component={TeamScreen} />
         <Stack.Screen name="EliminationScreen" component={EliminationScreen} />
-        <Stack.Screen name="CreateTour" component={CreateTourScreen} />
+        <Stack.Screen name="CreateTourScreen" component={CreateTourScreen} />
         <Stack.Screen name="TournamentView" component={TournamentView} />
         <Stack.Screen name="UserTeamView" component={UserTeamView} />
         <Stack.Screen name="UserTournamentView" component={UserTournamentView} />

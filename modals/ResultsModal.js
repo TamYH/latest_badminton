@@ -56,7 +56,7 @@ const ResultsModal = ({ visible, onClose, tournament }) => {
   // New function for elimination tournaments
   const generateEliminationResults = () => {
   // Use players array if teams array doesn't exist
-  const teams = tournament.teams || tournament.players;
+  const teams = tournament.teams || tournament.players || [];
   const completedMatchups = tournament.matchups.filter(m => m.completed && m.winner);
   const allMatchups = tournament.matchups;
   
@@ -97,18 +97,15 @@ const ResultsModal = ({ visible, onClose, tournament }) => {
     const winnerId = match.winner;
     const loserId = match.team1Id === winnerId ? match.team2Id : match.team1Id;
     
-    // Get winner and loser names from teams/players array
-    const winnerTeam = teams.find(team => team.id === winnerId);
-    const loserTeam = teams.find(team => team.id === loserId);
-    
-    const winnerName = winnerTeam ? winnerTeam.name : 'Unknown';
-    const loserName = loserTeam ? loserTeam.name : 'Unknown';
+    // Get winner and loser names directly from the match data
+    const winnerName = match.winner === match.team1Id ? match.team1Name : match.team2Name;
+    const loserName = match.winner === match.team1Id ? match.team2Name : match.team1Name;
     
     // Record match in history
     matchHistory.push({
       round: match.round || 1,
-      winner: winnerName,
-      loser: loserName,
+      winner: winnerName || 'Unknown',
+      loser: loserName || 'Unknown',
       roundName: getRoundName(match.round || 1, maxRound),
       winnerId: winnerId,
       loserId: loserId
@@ -125,16 +122,33 @@ const ResultsModal = ({ visible, onClose, tournament }) => {
       playerStatus[loserId].totalLosses++;
       playerStatus[loserId].status = 'eliminated';
       playerStatus[loserId].eliminatedInRound = match.round || 1;
-      playerStatus[loserId].eliminatedBy = winnerName;
+      playerStatus[loserId].eliminatedBy = winnerName || 'Unknown';
       playerStatus[loserId].reachedRound = match.round || 1;
     }
   });
 
-  // Determine champion
-  const activePlayers = Object.values(playerStatus).filter(player => player.status === 'active');
+  // Determine champion - check tournament.champion first (most reliable)
+  let champion = null;
   
-  if (activePlayers.length === 1 && completedMatchups.length > 0) {
-    activePlayers[0].status = 'champion';
+  // Check if tournament has an explicitly set champion
+  if (tournament.champion && tournament.championName) {
+    // Tournament already has a declared champion
+    if (playerStatus[tournament.champion]) {
+      playerStatus[tournament.champion].status = 'champion';
+      champion = {
+        id: tournament.champion,
+        name: tournament.championName,
+        status: 'champion'
+      };
+    }
+  } else {
+    // Otherwise use the traditional method to determine champion
+    const activePlayers = Object.values(playerStatus).filter(player => player.status === 'active');
+    
+    if (activePlayers.length === 1 && completedMatchups.length > 0) {
+      activePlayers[0].status = 'champion';
+      champion = activePlayers[0];
+    }
   }
 
   // Sort players for final rankings
@@ -153,8 +167,12 @@ const ResultsModal = ({ visible, onClose, tournament }) => {
     matchHistory: matchHistory.reverse(), // Most recent first
     tournamentStats: {
       totalRounds: maxRound,
-      champion: sortedResults.find(p => p.status === 'champion'),
-      isComplete: activePlayers.length <= 1 && completedMatchups.length > 0
+      champion: champion || tournament.champion ? {
+        id: tournament.champion,
+        name: tournament.championName,
+        status: 'champion'
+      } : null,
+      isComplete: tournament.completed || (activePlayers?.length <= 1 && completedMatchups.length > 0)
     }
   };
 

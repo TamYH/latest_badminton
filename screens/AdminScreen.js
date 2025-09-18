@@ -25,6 +25,8 @@ import VenueScreen from './VenueScreen';
 import RollerWheel from './RollerWheel';
 import EliminationScreen from './EliminationScreen';
 import CreateTourScreen from './CreateTourScreen';
+import TourRegisterScreen from './TourRegisterScreen';
+import { useApprovals } from '../context/ApprovalsContext';
 
 function StatisticsScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
@@ -43,6 +45,15 @@ function StatisticsScreen({ navigation }) {
     fetchStatistics();
   }, []);
 
+const navigateToScreen = (screenName, params = {}) => {
+    // Get the parent navigator (the main stack navigator from App.js)
+    const parentNavigation = navigation.getParent();
+    if (parentNavigation) {
+      parentNavigation.navigate(screenName, params);
+    } else {
+      console.warn(`Cannot navigate to ${screenName} - parent navigator not found`);
+    }
+  };
   const fetchStatistics = async () => {
     try {
       setLoading(true);
@@ -180,7 +191,47 @@ function StatisticsScreen({ navigation }) {
             <Text style={styles.statLabel}>Tournaments</Text>
           </View>
         </View>
-
+{/* Tournament approval */}
+<View style={styles.section}>
+  <Text style={styles.sectionHeader}>Tournament Management</Text>
+  <View style={styles.managementCards}>
+    <TouchableOpacity 
+      style={styles.managementCard}
+      onPress={() => navigateToScreen('CreateTourScreen')}
+    >
+      <Ionicons name="add-circle" size={24} color="#4CAF50" style={styles.cardIcon} />
+      <View style={styles.cardTextContent}>
+        <Text style={styles.managementCardTitle}>Create Tournament</Text>
+        <Text style={styles.managementCardDesc}>Create a new tournament</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color="#999" />
+    </TouchableOpacity>
+    
+    <TouchableOpacity 
+      style={styles.managementCard}
+      onPress={() => navigateToScreen('TourRegister')}
+    >
+      <Ionicons name="people" size={24} color="#FF9800" style={styles.cardIcon} />
+      <View style={styles.cardTextContent}>
+        <Text style={styles.managementCardTitle}>Registration Approvals</Text>
+        <Text style={styles.managementCardDesc}>Manage tournament registrations</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color="#999" />
+    </TouchableOpacity>
+    
+    <TouchableOpacity 
+      style={styles.managementCard}
+      onPress={() => navigateToScreen('TournamentView')}
+    >
+      <Ionicons name="trophy" size={24} color="#2196F3" style={styles.cardIcon} />
+      <View style={styles.cardTextContent}>
+        <Text style={styles.managementCardTitle}>View Active Tournaments</Text>
+        <Text style={styles.managementCardDesc}>Monitor ongoing tournaments</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color="#999" />
+    </TouchableOpacity>
+  </View>
+</View>
         {/* Tournament Statistics */}
         <View style={styles.section}>
           <Text style={styles.sectionHeader}>Tournament Stats</Text>
@@ -213,7 +264,7 @@ function StatisticsScreen({ navigation }) {
                 <TouchableOpacity
                   key={tournament.id}
                   style={styles.tournamentItem}
-                  onPress={() => navigation.navigate('TournamentView', { tournamentId: tournament.id })}
+                  onPress={() => navigateToScreen('TournamentView', { tournamentId: tournament.id })}
                 >
                   <Text style={styles.tournamentName}>{tournament.name}</Text>
                   <View style={styles.tournamentDetails}>
@@ -252,6 +303,16 @@ function StatisticsScreen({ navigation }) {
             <Text style={styles.emptyText}>No team statistics available</Text>
           )}
         </View>
+
+        {/* Tournament Registration Card */}
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => navigateToScreen('TourRegister')}
+        >
+          <Ionicons name="calendar-outline" size={24} color="#2196F3" />
+          <Text style={styles.cardTitle}>Tournament Registration</Text>
+          <Text style={styles.cardDescription}>Manage tournament registrations and approvals</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       <TouchableOpacity
@@ -272,64 +333,75 @@ function LogoutScreen() {
 const Tab = createBottomTabNavigator();
 
 export default function AdminScreen({ navigation }) {
+  // Add this hook to get the pending approvals count
+  const pendingApprovalsCount = useApprovals();
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarIcon: ({ color, size }) => {
-          let iconName;
-          switch (route.name) {
-            case 'Statistics':
-              iconName = 'stats-chart-outline';
-              break;
-            case 'Team':
-              iconName = 'people-outline';
-              break;
-            case 'Elimination':
-              iconName = 'trash-outline';  // or 'close-circle-outline' for a different icon
-              break;
-            case 'Venues':
-              iconName = 'location-outline';
-              break;
-            case 'Create Tour':
-              iconName = 'trophy-outline';
-              break;
-            case 'RollerWheel':
-              iconName = 'cog-outline';
-              break;
-            case 'Logout':
-              iconName = 'log-out-outline';
-              break;
-            default:
-              iconName = 'ellipse-outline';
-          }
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-      })}
-      tabBarOptions={{
-        activeTintColor: '#007aff',
-        inactiveTintColor: 'gray',
-      }}
-    >
-      <Tab.Screen name="Statistics" component={StatisticsScreen} />
-      <Tab.Screen name="Team" component={TeamScreen} />
-      <Tab.Screen name="Venues" component={VenueScreen} />
-      <Tab.Screen name="RollerWheel" component={RollerWheel} />
-      <Tab.Screen name="Elimination" component={EliminationScreen} />
-      <Tab.Screen name="Create Tour" component={CreateTourScreen} />
-
-      <Tab.Screen
-        name="Logout"
-        component={LogoutScreen}
-        listeners={({ navigation }) => ({
-          tabPress: e => {
-            e.preventDefault();
-            auth.signOut();
-            navigation.replace('Login');
-          },
-        })}
-      />
-    </Tab.Navigator>
+  screenOptions={({ route }) => ({
+    headerShown: false,
+    tabBarIcon: ({ color, size }) => {
+      let iconName;
+      switch (route.name) {
+        case 'Statistics':
+          iconName = 'stats-chart-outline';
+          break;
+        case 'Team':
+          iconName = 'people-outline';
+          break;
+        case 'Venues':
+          iconName = 'location-outline';
+          break;
+        case 'Tournament':  // Change 'Elimination' to 'Tournament'
+          iconName = 'trophy-outline';
+          break;
+        case 'Create Tour':
+          iconName = 'add-circle-outline';
+          break;
+        case 'Approvals':  // New tab for approvals
+          iconName = 'clipboard-outline';
+          break;
+        case 'RollerWheel':
+          iconName = 'cog-outline';
+          break;
+        case 'Logout':
+          iconName = 'log-out-outline';
+          break;
+        default:
+          iconName = 'ellipse-outline';
+      }
+      return <Ionicons name={iconName} size={size} color={color} />;
+    },
+  })}
+  tabBarOptions={{
+    activeTintColor: '#007aff',
+    inactiveTintColor: 'gray',
+  }}
+>
+  <Tab.Screen name="Statistics" component={StatisticsScreen} />
+  <Tab.Screen name="Team" component={TeamScreen} />
+  <Tab.Screen name="Venues" component={VenueScreen} />
+  <Tab.Screen name="Tournament" component={EliminationScreen} />
+  <Tab.Screen name="Create Tour" component={CreateTourScreen} />
+  <Tab.Screen 
+    name="Approvals" 
+    component={TourRegisterScreen}
+    options={{
+          tabBarBadge: pendingApprovalsCount > 0 ? pendingApprovalsCount : null
+    }}
+  />
+  <Tab.Screen name="RollerWheel" component={RollerWheel} />
+  <Tab.Screen
+  name="Logout"
+  component={LogoutScreen}
+  listeners={({ navigation }) => ({
+    tabPress: e => {
+      e.preventDefault();
+      // Just sign out - the onAuthStateChanged listener in App.js will handle navigation
+      auth.signOut();
+    },
+  })}
+/>
+</Tab.Navigator>
   );
 }
 
@@ -514,5 +586,64 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginLeft: 8
-  }
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 12,
+    marginBottom: 4
+  },
+  cardDescription: {
+    fontSize: 14,
+    color: '#6c757d',
+    marginLeft: 12
+  },
+  managementCards: {
+    marginTop: 8,
+  },
+  managementCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2196F3',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  cardIcon: {
+    marginRight: 16,
+  },
+  cardTextContent: {
+    flex: 1,
+  },
+  managementCardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  managementCardDesc: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
 });

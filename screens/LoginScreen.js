@@ -33,11 +33,11 @@ export default function LoginScreen({ navigation }) {
 
 
                 // Navigate to the correct screen based on the role
-                if (userRole === 'admin') {
-                    navigation.replace('AdminScreen');
-                } else {
-                    navigation.replace('UserScreen');
-                }
+               // if (userRole === 'admin') {
+                 //   navigation.replace('AdminScreen');
+               // } else {
+                   // navigation.replace('UserScreen');
+              //  }
             } else {
                 Alert.alert('Error', 'No user role assigned in Firestore.');
             }

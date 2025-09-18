@@ -43,7 +43,7 @@ export default function RegisterScreen({ navigation }) {
             });
 
             Alert.alert('Registration Successful', `You are registered as a ${role}`);
-            navigation.replace(role === 'admin' ? 'AdminScreen' : 'UserScreen');
+            //navigation.replace(role === 'admin' ? 'AdminScreen' : 'UserScreen');
         } catch (error) {
             Alert.alert('Registration Error', error.message);
         }

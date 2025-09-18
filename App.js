@@ -20,6 +20,7 @@ import UserTournamentView from './screens/UserTournamentView';
 import EliminationScreen from './screens/EliminationScreen';
 import CreateTourScreen from './screens/CreateTourScreen';
 import TourRegisterScreen from './screens/TourRegisterScreen';
+ 
 
 const Stack = createStackNavigator();
 

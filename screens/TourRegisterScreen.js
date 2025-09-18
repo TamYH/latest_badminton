@@ -14,6 +14,7 @@ import { collection, query, where, getDocs, doc, updateDoc, getDoc, arrayUnion, 
 import { getAuth } from 'firebase/auth';
 import { db } from '../firebase/config';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useFocusEffect } from '@react-navigation/native';
 
 const TourRegisterScreen = ({ navigation }) => {
   const [tournaments, setTournaments] = useState([]);
@@ -30,13 +31,20 @@ const TourRegisterScreen = ({ navigation }) => {
   const auth = getAuth();
   const user = auth.currentUser;
 
-  useEffect(() => {
-    checkAdminStatus();
-    fetchTournaments();
-    if (user) {
-      fetchUserTeams();
-    }
-  }, [user]);
+  useFocusEffect(
+    React.useCallback(() => {
+      checkAdminStatus();
+      fetchTournaments();
+      if (user) {
+        fetchUserTeams();
+      }
+      
+      // Optional cleanup function
+      return () => {
+        // Any cleanup code if needed
+      };
+    }, [user])
+  );
 
   const checkAdminStatus = async () => {
   if (user) {
@@ -265,12 +273,30 @@ const TourRegisterScreen = ({ navigation }) => {
   }
 };
 
-// Add these helper functions to generate matchups
+// To generate matchups for tournaments
 const generateEliminationMatchups = (players) => {
   const matchups = [];
-  const shuffledPlayers = [...players].sort(() => Math.random() - 0.5); // Shuffle for fairness
   
-  // Create first round matchups
+  // Create a copy and shuffle players for randomized matchups
+  const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
+  
+  console.log(`Creating elimination matchups for ${shuffledPlayers.length} players`);
+  
+  // Handle case where we have odd number of players
+  let hasBye = false;
+  let byePlayer = null;
+  
+  if (shuffledPlayers.length % 2 !== 0) {
+    // Select a random player to receive a bye
+    const byeIndex = Math.floor(Math.random() * shuffledPlayers.length);
+    byePlayer = shuffledPlayers.splice(byeIndex, 1)[0];
+    hasBye = true;
+    
+    console.log(`Player ${byePlayer.name} received a bye in round 1`);
+  }
+  
+  // Create normal first round matchups for the rest of the players
+  let matchNumber = 1;
   for (let i = 0; i < shuffledPlayers.length; i += 2) {
     if (i + 1 < shuffledPlayers.length) {
       const player1 = shuffledPlayers[i];
@@ -282,12 +308,36 @@ const generateEliminationMatchups = (players) => {
         team2Id: player2.id,
         team1Name: player1.name,
         team2Name: player2.name,
-        matchNumber: Math.floor(i / 2) + 1,
+        matchNumber: matchNumber,
         completed: false,
         winner: null,
         matchupTime: null
       });
+      
+      matchNumber++;
     }
+  }
+  
+  // If we have a bye player, add a "virtual match" that's already completed
+  if (hasBye) {
+    // Create a virtual opponent for display purposes
+    const virtualOpponent = {
+      id: `bye-${Date.now()}`,
+      name: "BYE"
+    };
+    
+    matchups.push({
+      round: 1,
+      team1Id: byePlayer.id,
+      team2Id: virtualOpponent.id,
+      team1Name: byePlayer.name,
+      team2Name: virtualOpponent.name,
+      matchNumber: matchNumber,
+      completed: true,  // This match is automatically completed
+      winner: byePlayer.id,  // Bye player automatically advances
+      matchupTime: null,
+      isBye: true  // Mark as a bye match for special handling in UI
+    });
   }
   
   return matchups;

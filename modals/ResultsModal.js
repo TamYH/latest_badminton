@@ -57,9 +57,12 @@ const ResultsModal = ({ visible, onClose, tournament }) => {
   const generateEliminationResults = () => {
   // Use players array if teams array doesn't exist
   const teams = tournament.teams || tournament.players || [];
-  const completedMatchups = tournament.matchups.filter(m => m.completed && m.winner);
-  const allMatchups = tournament.matchups;
+  const completedMatchups = tournament.matchups?.filter(m => m.completed && m.winner) || [];
+  const allMatchups = tournament.matchups || [];
   
+  console.log('Tournament type:', tournament.type);
+  console.log('Teams/Players:', teams);
+  console.log('Matchups:', allMatchups);
   console.log('Elimination Tournament Data:', { teams, completedMatchups, allMatchups });
   
   // Track player status in elimination tournament
@@ -127,7 +130,10 @@ const ResultsModal = ({ visible, onClose, tournament }) => {
     }
   });
 
-  // Determine champion - check tournament.champion first (most reliable)
+  // Define activePlayers before using it - THIS FIXES THE ERROR
+  const activePlayers = Object.values(playerStatus).filter(player => player.status === 'active');
+
+  // Determine champion
   let champion = null;
   
   // Check if tournament has an explicitly set champion
@@ -141,14 +147,10 @@ const ResultsModal = ({ visible, onClose, tournament }) => {
         status: 'champion'
       };
     }
-  } else {
+  } else if (activePlayers.length === 1 && completedMatchups.length > 0) {
     // Otherwise use the traditional method to determine champion
-    const activePlayers = Object.values(playerStatus).filter(player => player.status === 'active');
-    
-    if (activePlayers.length === 1 && completedMatchups.length > 0) {
-      activePlayers[0].status = 'champion';
-      champion = activePlayers[0];
-    }
+    activePlayers[0].status = 'champion';
+    champion = activePlayers[0];
   }
 
   // Sort players for final rankings
@@ -167,12 +169,12 @@ const ResultsModal = ({ visible, onClose, tournament }) => {
     matchHistory: matchHistory.reverse(), // Most recent first
     tournamentStats: {
       totalRounds: maxRound,
-      champion: champion || tournament.champion ? {
+      champion: champion || (tournament.champion ? {
         id: tournament.champion,
         name: tournament.championName,
         status: 'champion'
-      } : null,
-      isComplete: tournament.completed || (activePlayers?.length <= 1 && completedMatchups.length > 0)
+      } : null),
+      isComplete: tournament.completed || (activePlayers.length <= 1 && completedMatchups.length > 0)
     }
   };
 

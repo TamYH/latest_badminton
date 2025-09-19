@@ -220,7 +220,7 @@ const updateMatchupWinner = async (winner) => {
     setModalVisible(false);
     setLoading(true);
 
-    // Find the EXACT matchup by including matchNumber
+    // Find the EXACT matchup
     const matchupIndex = selectedTournament.matchups.findIndex(
       m => m.team1Id === selectedMatchup.team1Id &&
         m.team2Id === selectedMatchup.team2Id &&
@@ -232,6 +232,10 @@ const updateMatchupWinner = async (winner) => {
       throw new Error("Matchup not found");
     }
 
+    // Check if winner is changing from a previous selection
+    const previousWinner = selectedTournament.matchups[matchupIndex].winner;
+    const isWinnerChange = previousWinner && previousWinner !== winner;
+
     // Create updated matchups array
     const updatedMatchups = [...selectedTournament.matchups];
     updatedMatchups[matchupIndex] = {
@@ -240,202 +244,181 @@ const updateMatchupWinner = async (winner) => {
       completed: true
     };
 
-    // Update document in Firestore
+    // If changing winner from previous rounds, update subsequent matches instead of creating new ones
+    if (isWinnerChange && selectedTournament.type === 'elimination') {
+      const currentRound = selectedMatchup.round;
+      
+      // Find and update subsequent matches that included the previous winner
+      const subsequentMatches = updatedMatchups.filter(m => m.round > currentRound);
+      
+      for (let match of subsequentMatches) {
+        // If this match contains the previous winner, update it with new winner
+        if (match.team1Id === previousWinner) {
+          match.team1Id = winner;
+          match.team1Name = winner === selectedMatchup.team1Id ? selectedMatchup.team1Name : selectedMatchup.team2Name;
+          // Reset match if it was completed
+          if (match.completed) {
+            match.completed = false;
+            match.winner = null;
+          }
+        } else if (match.team2Id === previousWinner) {
+          match.team2Id = winner;
+          match.team2Name = winner === selectedMatchup.team1Id ? selectedMatchup.team1Name : selectedMatchup.team2Name;
+          // Reset match if it was completed
+          if (match.completed) {
+            match.completed = false;
+            match.winner = null;
+          }
+        }
+      }
+
+      // Update database with modified matches
+      const tournamentRef = doc(db, 'tournaments', selectedTournament.id);
+      await updateDoc(tournamentRef, {
+        matchups: updatedMatchups,
+        // Reset championship if it was already decided
+        completed: false,
+        champion: null,
+        championName: null
+      });
+
+      // Update local state
+      setSelectedTournament(prev => ({
+        ...prev,
+        matchups: updatedMatchups,
+        completed: false,
+        champion: null,
+        championName: null
+      }));
+
+      Alert.alert("Success", "Winner updated and subsequent matches have been reset");
+      setLoading(false);
+      setSelectedMatchup(null);
+      return;
+    }
+
+    // Update database first
     const tournamentRef = doc(db, 'tournaments', selectedTournament.id);
     await updateDoc(tournamentRef, {
       matchups: updatedMatchups
     });
 
-    // Check if this is an elimination tournament and if the current round is complete
-    if (selectedTournament.type === 'elimination') {
-      const currentRound = selectedMatchup.round;
-      const currentRoundMatches = updatedMatchups.filter(m => m.round === currentRound);
-      const completedCurrentRoundMatches = currentRoundMatches.filter(m => m.completed);
-
-      // If all matches in current round are complete, generate next round
-      if (currentRoundMatches.length === completedCurrentRoundMatches.length && currentRoundMatches.length > 0) {
-        // Get winners from current round
-        const winners = completedCurrentRoundMatches.map(match => {
-          // Use team names from the matchup itself instead of looking up teams
-          return {
-            id: match.winner,
-            name: match.winner === match.team1Id ? match.team1Name : match.team2Name
-          };
-        });
-
-        // Check if we have a champion (only 1 winner left)
-        if (winners.length === 1) {
-          Alert.alert(
-            "🏆 CHAMPION! 🏆",
-            `${winners[0].name} is the tournament champion!`,
-            [
-              {
-                text: "View Results",
-                onPress: () => setResultsModalVisible(true)
-              },
-              {
-                text: "OK",
-                style: "default"
-              }
-            ]
-          );
-
-          // Mark tournament as completed
-          await updateDoc(tournamentRef, {
-            completed: true,
-            champion: winners[0].id,
-            championName: winners[0].name
-          });
-
-        } else if (winners.length > 1) {
-          // Generate next round matches
-          await generateNextRoundMatches(currentRound, winners);
-        }
-      }
-    }
-
-    // Update local state
+    // Update local state immediately
     setSelectedTournament(prev => ({
       ...prev,
       matchups: updatedMatchups
     }));
 
-    // Check if all matches are completed
-    const allMatchesCompleted = updatedMatchups.every(m => m.completed === true);
+    // Handle elimination tournament round completion for new matches only
+    if (selectedTournament.type === 'elimination') {
+      const currentRound = selectedMatchup.round;
+      const currentRoundMatches = updatedMatchups.filter(m => m.round === currentRound);
+      const completedMatches = currentRoundMatches.filter(m => m.completed);
 
-    // If all matches are complete, update tournament status
-    if (allMatchesCompleted) {
-      let champion = null;
-      
-      if (selectedTournament.type !== 'elimination') {
-        // For round robin, determine champion based on points
-        const teams = selectedTournament.teams || selectedTournament.players;
-        const teamStats = {};
+      // If all matches in current round are complete
+      if (currentRoundMatches.length === completedMatches.length) {
+        // Check if next round already exists to avoid duplicates
+        const nextRoundExists = updatedMatchups.some(m => m.round > currentRound);
         
-        // Initialize team stats
-        teams.forEach(team => {
-          teamStats[team.id] = {
-            id: team.id,
-            name: team.name,
-            wins: 0,
-            points: 0
-          };
-        });
-        
-        // Count wins and calculate points
-        updatedMatchups.forEach(match => {
-          if (match.completed && match.winner) {
-            teamStats[match.winner].wins += 1;
-            teamStats[match.winner].points += 2;
+        if (!nextRoundExists) {
+          // Get winners from current round
+          const winners = completedMatches.map(match => ({
+            id: match.winner,
+            name: match.winner === match.team1Id ? match.team1Name : match.team2Name
+          })).filter(w => w.id);
+
+          console.log(`Round ${currentRound} complete. Winners:`, winners);
+
+          if (winners.length === 1) {
+            // Tournament complete - crown champion
+            await updateDoc(tournamentRef, {
+              completed: true,
+              champion: winners[0].id,
+              championName: winners[0].name
+            });
+
+            setSelectedTournament(prev => ({
+              ...prev,
+              completed: true,
+              champion: winners[0].id,
+              championName: winners[0].name
+            }));
+
+            Alert.alert("🏆 CHAMPION! 🏆", `${winners[0].name} is the tournament champion!`);
+          } else if (winners.length > 1) {
+            // Generate next round only if it doesn't exist
+            await generateNextRound(currentRound, winners, updatedMatchups);
           }
-        });
-        
-        // Find team with most points
-        let maxPoints = -1;
-        let championId = null;
-        
-        Object.values(teamStats).forEach(team => {
-          if (team.points > maxPoints) {
-            maxPoints = team.points;
-            championId = team.id;
-            champion = team;
-          }
-        });
-        
-        // Update document in Firestore to mark as completed
-        await updateDoc(tournamentRef, {
-          completed: true,
-          champion: champion.id,
-          championName: champion.name
-        });
-        
-        // Update local state
-        setSelectedTournament(prev => ({
-          ...prev,
-          completed: true,
-          champion: champion.id,
-          championName: champion.name
-        }));
-        
-        Alert.alert(
-          "🏆 CHAMPION! 🏆",
-          `${champion.name} is the tournament champion!`,
-          [
-            {
-              text: "View Results",
-              onPress: () => setResultsModalVisible(true)
-            },
-            {
-              text: "OK",
-              style: "default"
-            }
-          ]
-        );
+        }
       }
     }
 
     Alert.alert("Success", "Winner updated successfully");
   } catch (error) {
     console.error("Error updating matchup:", error);
-    Alert.alert("Error", "Failed to update matchup");
+    Alert.alert("Error", "Failed to update matchup: " + error.message);
   } finally {
     setLoading(false);
     setSelectedMatchup(null);
   }
 };
-
-
-
-const generateNextRoundMatches = async (currentRound, winners) => {
-  if (winners.length < 2) return; // Need at least 2 winners to create next round
-
+const generateNextRound = async (currentRound, winners, currentMatchups) => {
   const nextRound = currentRound + 1;
   const nextRoundMatches = [];
 
-  // Pair up winners for next round
-  for (let i = 0; i < winners.length; i += 2) {
-    if (i + 1 < winners.length) {
-      const team1 = winners[i];
-      const team2 = winners[i + 1];
-     
+  // Handle odd number of winners (one gets bye)
+  const winnersCopy = [...winners];
+  if (winnersCopy.length % 2 !== 0) {
+    const playerWithBye = winnersCopy.pop();
+    nextRoundMatches.push({
+      round: nextRound,
+      team1Id: playerWithBye.id,
+      team2Id: `bye-${Date.now()}`,
+      team1Name: playerWithBye.name,
+      team2Name: "BYE",
+      matchNumber: 1,
+      completed: true,
+      winner: playerWithBye.id,
+      isBye: true
+    });
+  }
+
+  // Pair remaining winners
+  for (let i = 0; i < winnersCopy.length; i += 2) {
+    if (i + 1 < winnersCopy.length) {
       nextRoundMatches.push({
         round: nextRound,
-        team1Id: team1.id,
-        team2Id: team2.id,
-        team1Name: team1.name,
-        team2Name: team2.name,
-        matchNumber: Math.floor(i / 2) + 1,
+        team1Id: winnersCopy[i].id,
+        team2Id: winnersCopy[i + 1].id,
+        team1Name: winnersCopy[i].name,
+        team2Name: winnersCopy[i + 1].name,
+        matchNumber: nextRoundMatches.length + 1,
         completed: false,
-        winner: null,
-        matchupTime: null
+        winner: null
       });
     }
   }
 
   if (nextRoundMatches.length > 0) {
-    // Add next round matches to the tournament
-    const updatedMatchups = [...selectedTournament.matchups, ...nextRoundMatches];
-   
+    const allMatchups = [...currentMatchups, ...nextRoundMatches];
+    
+    // Update database
     const tournamentRef = doc(db, 'tournaments', selectedTournament.id);
     await updateDoc(tournamentRef, {
-      matchups: updatedMatchups,
+      matchups: allMatchups,
       currentRound: nextRound
     });
 
-    // Update local state
+    // Update local state immediately
     setSelectedTournament(prev => ({
       ...prev,
-      matchups: updatedMatchups,
+      matchups: allMatchups,
       currentRound: nextRound
     }));
 
-    Alert.alert(
-      "Round Advanced!",
-      `Round ${nextRound} matches have been created with the winners from Round ${currentRound}.`
-    );
+    console.log(`Generated round ${nextRound} with ${nextRoundMatches.length} matches`);
   }
 };
-
 // Also update the saveMatchupTime function to use the same logic:
 const saveMatchupTime = async () => {
   if (!selectedMatchup || !selectedTournament) return;
@@ -528,6 +511,8 @@ const saveMatchupTime = async () => {
 
   // Render matchup item
   const renderMatchupItem = ({ item, index }) => {
+    // Check if this is a bye match
+  const isBye = item.isBye || item.team2Id?.startsWith("bye-") || item.team2Name === "BYE";
     // Extract player names based on matchNumber in round robin tournaments
     let player1Name = item.team1Name;
     let player2Name = item.team2Name;
@@ -567,9 +552,11 @@ const saveMatchupTime = async () => {
       <TouchableOpacity
         style={[
           styles.matchupItem,
-          item.completed && styles.completedMatchup
+          item.completed && styles.completedMatchup,
+          isBye && styles.byeMatch
         ]}
-        onPress={() => openMatchupModal(item)}
+        onPress={() => isBye ? null : openMatchupModal(item)} // Disable press for bye matches
+      disabled={isBye} // Add this line to disable touch for bye matches
       >
         <Text style={styles.matchupTitle}>Round {item.round} - Match {index + 1}</Text>
 
@@ -617,6 +604,12 @@ const saveMatchupTime = async () => {
             Winner: {item.winner === item.team1Id ? player1Name : player2Name}
           </Text>
         )}
+        {/* Add this block - shows orange "Auto-advance" text */}
+      {isBye && (
+        <Text style={styles.byeExplanation}>
+          Auto-advance To Next Round
+        </Text>
+      )}
       </TouchableOpacity>
     );
   };
@@ -1360,7 +1353,17 @@ resultsButtonText: {
   textAlign: 'center',
 },
 
-
+byeMatch: {
+  backgroundColor: '#fff3cd',
+  borderLeftColor: '#fd7e14',
+  opacity: 0.8,
+},
+byeExplanation: {
+  fontSize: 12,
+  fontStyle: 'italic',
+  color: '#fd7e14',
+  marginTop: 4,
+}
 
 });
 

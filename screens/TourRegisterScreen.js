@@ -116,30 +116,36 @@ const TourRegisterScreen = ({ navigation }) => {
   };
 
   const fetchUserTeams = async () => {
-    try {
-      const teamsQuery = query(
-        collection(db, 'teams'),
-        where('createdBy', '==', user.uid)
-      );
+  try {
+    // Get user's sanitized email to match the memberIds format
+    const sanitizedEmail = user.email.replace(/[@.]/g, '_');
+    
+    // Query teams where the user is a member
+    const teamsQuery = query(collection(db, 'teams'));
+    const querySnapshot = await getDocs(teamsQuery);
+    const teamsData = [];
+    
+    querySnapshot.forEach((doc) => {
+      const team = doc.data();
       
-      const querySnapshot = await getDocs(teamsQuery);
-      const teamsData = [];
-      
-      querySnapshot.forEach((doc) => {
-        const team = doc.data();
-        // Only include teams with exactly 5 members for Round Robin
+      // Check if current user is in the memberIds array
+      if (team.memberIds && team.memberIds.includes(sanitizedEmail)) {
         teamsData.push({
           id: doc.id,
-          ...team,
-          valid: team.members && team.members.length === 5
+          name: team.name,
+          members: team.memberIds || [],
+          memberIds: team.memberIds || [],
+          valid: team.memberIds && team.memberIds.length === 5
         });
-      });
-      
-      setUserTeams(teamsData);
-    } catch (error) {
-      console.error("Error fetching user teams:", error);
-    }
-  };
+      }
+    });
+    
+    setUserTeams(teamsData);
+    console.log('User teams found:', teamsData);
+  } catch (error) {
+    console.error("Error fetching user teams:", error);
+  }
+};
 
   const registerForTournament = async () => {
     if (!selectedTournament) return;
@@ -475,15 +481,32 @@ const renderTournamentItem = ({ item }) => {
   // Check user registration status
   const pendingRegistration = item.pendingRegistrations?.find(reg => reg.userId === user?.uid);
   const approvedRegistration = item.approvedRegistrations?.find(reg => reg.userId === user?.uid);
-  const userRegistered = pendingRegistration || approvedRegistration;
   
-  // Determine registration status
+  // NEW: Check if user is part of any team that has registered for this tournament
+  const sanitizedEmail = user?.email?.replace(/[@.]/g, '_');
+  
+  // Check pending registrations for teams containing this user
+  const teamPendingRegistration = item.pendingRegistrations?.find(reg => 
+    reg.type === 'team' && reg.members && reg.members.includes(sanitizedEmail)
+  );
+  
+  // Check approved registrations for teams containing this user
+  const teamApprovedRegistration = item.approvedRegistrations?.find(reg => 
+    reg.type === 'team' && reg.members && reg.members.includes(sanitizedEmail)
+  );
+  
+  // Determine final registration status
+  const userRegistered = pendingRegistration || approvedRegistration || teamPendingRegistration || teamApprovedRegistration;
+  
   let registrationStatus = 'none'; // none, pending, approved
-  if (approvedRegistration) {
+  if (approvedRegistration || teamApprovedRegistration) {
     registrationStatus = 'approved';
-  } else if (pendingRegistration) {
+  } else if (pendingRegistration || teamPendingRegistration) {
     registrationStatus = 'pending';
   }
+  
+  // Get the team name if user is registered via team
+  const teamName = teamPendingRegistration?.teamName || teamApprovedRegistration?.teamName;
   
   return (
     <View style={styles.tournamentItem}>
@@ -567,8 +590,20 @@ const renderTournamentItem = ({ item }) => {
                   disabled={true}
                 >
                   <Ionicons name="time-outline" size={16} color="#f57c00" style={styles.buttonIcon} />
-                  <Text style={styles.pendingStatusText}>Pending Approval</Text>
+                  <Text style={styles.pendingStatusText}>
+                    {teamName ? `Team "${teamName}" Pending Approval` : 'Pending Approval'}
+                  </Text>
                 </TouchableOpacity>
+                
+                {/* Show team info if registered via team */}
+                {teamName && (
+                  <View style={styles.teamInfoContainer}>
+                    <Text style={styles.teamInfoText}>
+                      📋 You are registered as part of team "{teamName}". 
+                      Wait for admin approval or team captain to make changes.
+                    </Text>
+                  </View>
+                )}
               </View>
             ) : (
               <View style={styles.statusContainer}>
@@ -577,21 +612,23 @@ const renderTournamentItem = ({ item }) => {
                   disabled={true}
                 >
                   <Ionicons name="checkmark-circle" size={16} color="#4CAF50" style={styles.buttonIcon} />
-                  <Text style={styles.approvedStatusText}>Registration Accepted</Text>
+                  <Text style={styles.approvedStatusText}>
+                    {teamName ? `Team "${teamName}" Accepted` : 'Registration Accepted'}
+                  </Text>
                 </TouchableOpacity>
                 
                 {/* Show additional info for approved users */}
                 <View style={styles.approvedInfoContainer}>
                   <Text style={styles.approvedInfoText}>
-                    🎉 You're registered! Tournament will start when minimum participants are reached.
+                    🎉 {teamName ? `Your team "${teamName}" is registered!` : 'You\'re registered!'} 
+                    Tournament will start when minimum participants are reached.
                   </Text>
                 </View>
               </View>
             )}
           </View>
-          )}
+        )}
       </View>
-
     </View>
   );
 };
@@ -1417,6 +1454,22 @@ userSummaryText: {
   fontSize: 14,
   color: '#1976d2',
   fontWeight: '500',
+},
+
+teamInfoContainer: {
+  marginTop: 8,
+  padding: 10,
+  backgroundColor: '#fff3cd',
+  borderRadius: 4,
+  borderLeftWidth: 3,
+  borderLeftColor: '#f57c00',
+},
+teamInfoText: {
+  fontSize: 12,
+  color: '#856404',
+  fontStyle: 'italic',
+  textAlign: 'center',
+  lineHeight: 16,
 },
 });
 

@@ -353,6 +353,75 @@ const updateMatchupWinner = async (winner) => {
       }
     }
 
+    // Handle tournament completion for Round Robin
+if (selectedTournament.type === 'roundrobin') {
+  const allMatches = updatedMatchups;
+  const completedMatches = allMatches.filter(m => m.completed);
+  
+  // If all matches are completed, mark tournament as completed
+  if (completedMatches.length === allMatches.length && allMatches.length > 0) {
+    // Find the team with the most wins to set as champion
+    const teamStats = {};
+    
+    // Initialize team stats
+    selectedTournament.teams?.forEach(team => {
+      const teamId = team.teamId || team.id;
+      teamStats[teamId] = {
+        id: teamId,
+        name: team.teamName || team.name,
+        wins: 0
+      };
+    });
+    
+    // Count wins for each team
+    completedMatches.forEach(match => {
+      const winnerId = match.winner;
+      if (teamStats[winnerId]) {
+        teamStats[winnerId].wins++;
+      }
+    });
+    
+    // Find champion (team with most wins)
+    let champion = null;
+    let maxWins = -1;
+    
+    Object.values(teamStats).forEach(team => {
+      if (team.wins > maxWins) {
+        maxWins = team.wins;
+        champion = {
+          id: team.id,
+          name: team.name
+        };
+      }
+    });
+    
+    // Update tournament as completed with champion
+    await updateDoc(tournamentRef, {
+      completed: true,
+      champion: champion?.id || null,
+      championName: champion?.name || null
+    });
+    
+    // Update local state
+    setSelectedTournament(prev => ({
+      ...prev,
+      matchups: updatedMatchups,
+      completed: true,
+      champion: champion?.id || null,
+      championName: champion?.name || null
+    }));
+    
+    // Notify user
+    if (champion) {
+      Alert.alert("🏆 TOURNAMENT COMPLETED! 🏆", `${champion.name} is the tournament champion!`);
+    } else {
+      Alert.alert("Tournament Completed", "All matches have been played.");
+    }
+    
+    return; // Exit early since we've handled the update
+  }
+}
+
     Alert.alert("Success", "Winner updated successfully");
   } catch (error) {
     console.error("Error updating matchup:", error);

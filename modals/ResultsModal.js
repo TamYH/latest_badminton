@@ -241,158 +241,156 @@ const ResultsModal = ({ visible, onClose, tournament }) => {
 
   // Original round robin function (keeping it as is)
   const generateRoundRobinResults = () => {
-  // Use players array if teams array doesn't exist
-  const teams = tournament.teams || tournament.players;
-  const completedMatchups = tournament.matchups.filter(m => m.completed && m.winner);
-  const allMatchups = tournament.matchups;
-
-
-
-  // Initialize results matrix
-  const results = {};
-  const teamStats = {};
-
-  // Initialize team stats
+  console.log('Generating Round Robin results...');
+  
+  // Use the teams array from tournament data
+  const teams = tournament.teams || tournament.approvedRegistrations || [];
+  
+  if (teams.length === 0) {
+    setResultsTable({
+      type: 'roundrobin',
+      players: [],
+      matchHistory: [],
+      tournamentStats: {
+        totalMatches: 0,
+        completedMatches: 0,
+        isComplete: false
+      }
+    });
+    return;
+  }
+  
+  // Initialize team standings and tracking for head-to-head results
+  const teamStandings = {};
   teams.forEach(team => {
-    teamStats[team.id] = {
-      id: team.id,
-      name: team.name,
+    const teamId = team.teamId || team.id;
+    const teamName = team.teamName || team.name || 'Unknown Team';
+    
+    teamStandings[teamId] = {
+      id: teamId,
+      name: teamName,
       totalWins: 0,
+      totalLosses: 0,
       totalMatches: 0,
+      winPercentage: 0,
+      points: 0,
       individualWins: 0,
       individualLosses: 0,
-      points: 0
+      status: 'active',
+      results: {}
     };
-    results[team.id] = {};
+    
+    // Initialize head-to-head results against each opponent
     teams.forEach(opponent => {
-      if (team.id !== opponent.id) {
-        results[team.id][opponent.id] = {
+      const opponentId = opponent.teamId || opponent.id;
+      if (teamId !== opponentId) {
+        teamStandings[teamId].results[opponentId] = {
+          played: false,
           wins: 0,
           losses: 0,
-          played: 0,
-          result: null // 'W', 'L', or null
+          result: '-'
         };
       }
     });
   });
-
-  // Group matchups by team pairing to calculate team vs team results
-  const teamMatchups = {};
- 
-  completedMatchups.forEach(match => {
-    const pairingKey = [match.team1Id, match.team2Id].sort().join('-');
-   
-    if (!teamMatchups[pairingKey]) {
-      teamMatchups[pairingKey] = {
-        team1Id: match.team1Id,
-        team2Id: match.team2Id,
-        team1Wins: 0,
-        team2Wins: 0,
-        completed: 0
-      };
-    }
-   
-    // Count individual match wins
-    if (match.winner === match.team1Id) {
-      teamMatchups[pairingKey].team1Wins++;
-      teamStats[match.team1Id].individualWins++;
-      teamStats[match.team2Id].individualLosses++;
-    } else if (match.winner === match.team2Id) {
-      teamMatchups[pairingKey].team2Wins++;
-      teamStats[match.team2Id].individualWins++;
-      teamStats[match.team1Id].individualLosses++;
-    }
-   
-    teamMatchups[pairingKey].completed++;
-  });
-
-  // Calculate team vs team results
-  Object.values(teamMatchups).forEach(pairing => {
-    const team1Id = pairing.team1Id;
-    const team2Id = pairing.team2Id;
-   
-    // Update results matrix with current score
-    results[team1Id][team2Id] = {
-      wins: pairing.team1Wins,
-      losses: pairing.team2Wins,
-      played: pairing.completed > 0 ? 1 : 0,
-      result: pairing.team1Wins > pairing.team2Wins ? 'W' :
-              pairing.team2Wins > pairing.team1Wins ? 'L' : null
-    };
-   
-    results[team2Id][team1Id] = {
-      wins: pairing.team2Wins,
-      losses: pairing.team1Wins,
-      played: pairing.completed > 0 ? 1 : 0,
-      result: pairing.team2Wins > pairing.team1Wins ? 'W' :
-              pairing.team1Wins > pairing.team2Wins ? 'L' : null
-    };
-
-    // Award points based on completion status
-    if (pairing.completed > 0) {
-      if (pairing.completed === 5) {
-        // Full match completed - award full points
-        teamStats[team1Id].totalMatches++;
-        teamStats[team2Id].totalMatches++;
-       
-        if (pairing.team1Wins > pairing.team2Wins) {
-          teamStats[team1Id].totalWins++;
-          teamStats[team1Id].points += 2;
-        } else if (pairing.team2Wins > pairing.team1Wins) {
-          teamStats[team2Id].totalWins++;
-          teamStats[team2Id].points += 2;
-        } else {
-          teamStats[team1Id].points += 1;
-          teamStats[team2Id].points += 1;
-        }
-      } else {
-        // Partial match - award partial points based on current lead
-        const totalMatches = pairing.completed;
-        const progressPoints = (totalMatches / 5) * 2;
-       
-        if (pairing.team1Wins > pairing.team2Wins) {
-          teamStats[team1Id].points += progressPoints * 0.6;
-          teamStats[team2Id].points += progressPoints * 0.4;
-        } else if (pairing.team2Wins > pairing.team1Wins) {
-          teamStats[team2Id].points += progressPoints * 0.6;
-          teamStats[team1Id].points += progressPoints * 0.4;
-        } else {
-          teamStats[team1Id].points += progressPoints * 0.5;
-          teamStats[team2Id].points += progressPoints * 0.5;
-        }
+  
+  // Process completed matches
+  const completedMatches = tournament.matchups?.filter(m => m.completed && m.winner) || [];
+  const matchHistory = [];
+  
+  completedMatches.forEach((match, index) => {
+    const winnerId = match.winner;
+    const loserId = match.team1Id === winnerId ? match.team2Id : match.team1Id;
+    
+    // Get safe names for display
+    const winnerTeamName = match.winner === match.team1Id ? match.team1Name : match.team2Name;
+    const loserTeamName = match.winner === match.team1Id ? match.team2Name : match.team1Name;
+    const winnerPlayerName = match.winner === match.team1Id ? match.player1Name : match.player2Name;
+    const loserPlayerName = match.winner === match.team1Id ? match.player2Name : match.player1Name;
+    
+    // Safe display names
+    const safeWinnerName = winnerPlayerName ? winnerPlayerName.replace(/_gmail_com$/, '@gmail.com') : 'Unknown';
+    const safeLoserName = loserPlayerName ? loserPlayerName.replace(/_gmail_com$/, '@gmail.com') : 'Unknown';
+    
+    // Update team standings
+    if (teamStandings[winnerId]) {
+      teamStandings[winnerId].totalWins++;
+      teamStandings[winnerId].totalMatches++;
+      teamStandings[winnerId].points += 2; // 2 points for team win
+      teamStandings[winnerId].individualWins++;
+      
+      // Update head-to-head results
+      if (teamStandings[winnerId].results[loserId]) {
+        teamStandings[winnerId].results[loserId].played = true;
+        teamStandings[winnerId].results[loserId].wins++;
+        teamStandings[winnerId].results[loserId].result = 'W';
       }
     }
-  });
-
-  // Convert to array format for table display
-  const tableData = teams.map(team => ({
-    ...teamStats[team.id],
-    results: results[team.id]
-  }));
-
-  // Sort by points (desc), then by total wins (desc), then by individual wins (desc)
-  tableData.sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points;
-    if (b.totalWins !== a.totalWins) return b.totalWins - a.totalWins;
-    return b.individualWins - a.individualWins;
-  });
-
-  // Check if tournament is complete and determine champion
-  const isComplete = allMatchups.length > 0 && 
-    (allMatchups.filter(m => m.completed).length === allMatchups.length);
-  
-  // Add tournament stats to the results
-  const roundRobinResults = {
-    tableData,
-    tournamentStats: {
-      isComplete,
-      champion: isComplete && tableData.length > 0 ? tableData[0] : null,
-      totalMatches: allMatchups.length,
-      completedMatches: completedMatchups.length
+    
+    if (teamStandings[loserId]) {
+      teamStandings[loserId].totalLosses++;
+      teamStandings[loserId].totalMatches++;
+      teamStandings[loserId].individualLosses++;
+      
+      // Update head-to-head results
+      if (teamStandings[loserId].results[winnerId]) {
+        teamStandings[loserId].results[winnerId].played = true;
+        teamStandings[loserId].results[winnerId].losses++;
+        teamStandings[loserId].results[winnerId].result = 'L';
+      }
     }
-  };
-
-  setResultsTable(roundRobinResults);
+    
+    // Add to match history with unique key
+    matchHistory.push({
+      matchId: `match-${match.round || 1}-${match.matchNumber || index + 1}`,
+      round: match.round || 1,
+      matchNumber: match.matchNumber || index + 1,
+      winner: safeWinnerName,
+      loser: safeLoserName,
+      winnerTeam: winnerTeamName || 'Unknown Team',
+      loserTeam: loserTeamName || 'Unknown Team',
+      roundName: `Match ${match.matchNumber || index + 1}`
+    });
+  });
+  
+  // Calculate win percentages and sort teams
+  const sortedTeams = Object.values(teamStandings)
+    .map(team => ({
+      ...team,
+      winPercentage: team.totalMatches > 0 ? ((team.totalWins / team.totalMatches) * 100).toFixed(1) : '0.0'
+    }))
+    .sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.totalWins !== a.totalWins) return b.totalWins - a.totalWins;
+      return 0;
+    });
+  
+  // Determine if tournament is complete
+  const isComplete = tournament.completed || 
+    (completedMatches.length === tournament.matchups?.length && tournament.matchups?.length > 0);
+  
+  // Set champion if tournament is complete
+  let champion = null;
+  if (isComplete && sortedTeams.length > 0) {
+    champion = {
+      id: sortedTeams[0].id,
+      name: sortedTeams[0].name,
+      points: sortedTeams[0].points
+    };
+    sortedTeams[0].status = 'champion';
+  }
+  
+  setResultsTable({
+    type: 'roundrobin',
+    tableData: sortedTeams,
+    matchHistory: matchHistory.reverse(),
+    tournamentStats: {
+      totalMatches: tournament.matchups?.length || 0,
+      completedMatches: completedMatches.length,
+      isComplete: isComplete,
+      champion: champion
+    }
+  });
 };
 
 

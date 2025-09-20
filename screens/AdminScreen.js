@@ -27,6 +27,7 @@ import EliminationScreen from './EliminationScreen';
 import CreateTourScreen from './CreateTourScreen';
 import TourRegisterScreen from './TourRegisterScreen';
 import { useApprovals } from '../context/ApprovalsContext';
+import TournamentView from './TournamentView';
 
 function StatisticsScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
@@ -162,7 +163,7 @@ const navigateToScreen = (screenName, params = {}) => {
         <Text style={styles.header}>Admin Dashboard</Text>
         <TouchableOpacity 
           style={styles.createButton}
-          onPress={() => navigation.navigate('Create Tour')}
+          onPress={() => navigation.navigate('EliminationScreen')}
         >
           <Ionicons name="trophy-outline" size={24} color="white" />
         </TouchableOpacity>
@@ -304,15 +305,7 @@ const navigateToScreen = (screenName, params = {}) => {
           )}
         </View>
 
-        {/* Tournament Registration Card */}
-        <TouchableOpacity
-          style={styles.card}
-          onPress={() => navigateToScreen('TourRegister')}
-        >
-          <Ionicons name="calendar-outline" size={24} color="#2196F3" />
-          <Text style={styles.cardTitle}>Tournament Registration</Text>
-          <Text style={styles.cardDescription}>Manage tournament registrations and approvals</Text>
-        </TouchableOpacity>
+        
       </ScrollView>
 
       <TouchableOpacity
@@ -360,9 +353,7 @@ export default function AdminScreen({ navigation }) {
         case 'Approvals':  // New tab for approvals
           iconName = 'clipboard-outline';
           break;
-        case 'RollerWheel':
-          iconName = 'cog-outline';
-          break;
+       
         case 'Logout':
           iconName = 'log-out-outline';
           break;
@@ -380,7 +371,7 @@ export default function AdminScreen({ navigation }) {
   <Tab.Screen name="Statistics" component={StatisticsScreen} />
   <Tab.Screen name="Team" component={TeamScreen} />
   <Tab.Screen name="Venues" component={VenueScreen} />
-  <Tab.Screen name="Tournament" component={EliminationScreen} />
+  <Tab.Screen name="Tournament" component={TournamentView} />
   <Tab.Screen name="Create Tour" component={CreateTourScreen} />
   <Tab.Screen 
     name="Approvals" 
@@ -389,7 +380,7 @@ export default function AdminScreen({ navigation }) {
           tabBarBadge: pendingApprovalsCount > 0 ? pendingApprovalsCount : null
     }}
   />
-  <Tab.Screen name="RollerWheel" component={RollerWheel} />
+  
   <Tab.Screen
   name="Logout"
   component={LogoutScreen}

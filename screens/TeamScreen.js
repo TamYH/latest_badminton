@@ -540,7 +540,7 @@ function TeamScreen({ route, navigation }) {
           <Text style={styles.subtitle}>
             {isTournamentMode
               ? 'Select exactly 5 members for your team'
-              : 'Select members for your team'
+              : 'Select members for team'
             }
           </Text>
         </View>

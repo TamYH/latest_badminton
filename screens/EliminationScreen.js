@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
-  TextInput, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
   Alert,
   ActivityIndicator,
   SafeAreaView,
@@ -30,18 +30,18 @@ const EliminationScreen = ({ navigation }) => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      
+
       // Get all users from Firestore
       const usersCollection = collection(db, 'users');
       const querySnapshot = await getDocs(usersCollection);
-      
+
       const usersList = querySnapshot.docs.map(doc => ({
         id: doc.id,
         email: doc.data().email || doc.id,
         name: doc.data().name || doc.data().email || doc.id,
         selected: false
       }));
-      
+
       setUsers(usersList);
       setLoading(false);
     } catch (error) {
@@ -58,9 +58,9 @@ const EliminationScreen = ({ navigation }) => {
       }
       return u;
     });
-    
+
     setUsers(updatedPlayers);
-    
+
     // Update selected players
     const newSelectedPlayers = updatedPlayers.filter(p => p.selected);
     setSelectedPlayers(newSelectedPlayers);
@@ -80,25 +80,25 @@ const EliminationScreen = ({ navigation }) => {
 
     try {
       setSaving(true);
-      
+
       // Create matchups for players (single elimination format)
       let matchups = [];
       const shuffledPlayers = [...selectedPlayers].sort(() => 0.5 - Math.random());
-      
+
       // If odd number of players, one gets a bye in the first round
-      const evenPlayers = shuffledPlayers.length % 2 === 0 
-        ? shuffledPlayers 
+      const evenPlayers = shuffledPlayers.length % 2 === 0
+        ? shuffledPlayers
         : [...shuffledPlayers, { id: 'bye', name: 'BYE', email: 'bye' }];
-      
+
       // Create first round matchups
       for (let i = 0; i < evenPlayers.length; i += 2) {
         const player1 = evenPlayers[i];
         const player2 = evenPlayers[i + 1];
-        
+
         // If player2 is a bye, player1 automatically advances
         const completed = player2.id === 'bye';
         const winner = completed ? player1.id : null;
-        
+
         matchups.push({
           round: 1,
           team1Id: player1.id,
@@ -110,7 +110,7 @@ const EliminationScreen = ({ navigation }) => {
           matchupTime: ''
         });
       }
-      
+
       // Create the tournament in Firestore
       const tournamentRef = await addDoc(collection(db, 'tournaments'), {
         name: tournamentName,
@@ -126,15 +126,15 @@ const EliminationScreen = ({ navigation }) => {
           email: p.email
         }))
       });
-      
+
       setSaving(false);
       Alert.alert(
         'Success',
         'Tournament created successfully!',
         [
-          { 
-            text: 'View Tournament', 
-            onPress: () => navigation.navigate('TournamentView', { tournamentId: tournamentRef.id }) 
+          {
+            text: 'View Tournament',
+            onPress: () => navigation.navigate('TournamentView', { tournamentId: tournamentRef.id })
           },
           { text: 'OK', onPress: () => navigation.goBack() }
         ]
@@ -170,10 +170,17 @@ const EliminationScreen = ({ navigation }) => {
         <View style={styles.header}>
           <Text style={styles.title}>Individual Elimination Tournament</Text>
           <Text style={styles.subtitle}>
-            Create a tournament where individuals compete directly (not teams)
+            Create a quick tournament where individuals compete directly (Testing purpose)
           </Text>
         </View>
-        
+
+        <View style={{ position: 'absolute', right: 40, top: 25, alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => navigation.navigate('RollerWheel')}>
+            <Ionicons name="cog-outline" size={36} color="#007aff" />
+          </TouchableOpacity>
+          <Text style={{ fontSize: 12, color: '#007aff', marginTop: 2 }}>Roller wheel</Text>
+        </View>
+
         <View style={styles.formSection}>
           <Text style={styles.label}>Tournament Name</Text>
           <TextInput
@@ -183,11 +190,11 @@ const EliminationScreen = ({ navigation }) => {
             placeholder="Enter tournament name"
             placeholderTextColor="#999"
           />
-          
+
           <Text style={styles.label}>Select Players ({selectedPlayers.length} selected)</Text>
           <Text style={styles.infoText}>Tap on players to select them for the tournament</Text>
         </View>
-        
+
         <FlatList
           data={users}
           keyExtractor={(item) => item.id}
@@ -211,7 +218,7 @@ const EliminationScreen = ({ navigation }) => {
           scrollEnabled={false} // Since we're inside a ScrollView
         />
       </ScrollView>
-      
+
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.button, selectedPlayers.length < 2 && styles.buttonDisabled]}
@@ -220,7 +227,7 @@ const EliminationScreen = ({ navigation }) => {
         >
           <Text style={styles.buttonText}>Create Tournament</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={styles.secondaryButton}
           onPress={() => navigation.goBack()}

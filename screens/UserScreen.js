@@ -92,7 +92,10 @@ function HomeScreen({ navigation }) {
             <TouchableOpacity
               key={tournament.id}
               style={styles.quickTournamentCard}
-              onPress={() => navigation.navigate('TournamentView', { tournamentId: tournament.id })}
+              onPress={() => navigation.navigate('Tournament', { 
+                screen: 'UserTournamentView',
+                params: { tournamentId: tournament.id }
+              })}
             >
               <Text style={styles.quickTournamentName}>{tournament.name}</Text>
               <Text style={styles.quickTournamentStatus}>
@@ -104,7 +107,9 @@ function HomeScreen({ navigation }) {
           {joinedTournaments.length > 2 && (
             <TouchableOpacity
               style={styles.viewAllButton}
-              onPress={() => navigation.navigate('Tournament')}
+              onPress={() => navigation.navigate('Tournament', {
+                screen: 'UserTournamentView'
+              })}
             >
               <Text style={styles.viewAllText}>
                 View all {joinedTournaments.length} tournaments

@@ -18,12 +18,13 @@ import {
   query, 
   orderBy 
 } from 'firebase/firestore';
+import ResultsModal from '../modals/ResultsModal';
 
 const UserTournamentView = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [tournaments, setTournaments] = useState([]);
   const [selectedTournament, setSelectedTournament] = useState(null);
-
+  const [resultsModalVisible, setResultsModalVisible] = useState(false);
   // Check if a specific tournament was requested
   const tournamentId = route.params?.tournamentId;
 
@@ -225,48 +226,136 @@ const UserTournamentView = ({ route, navigation }) => {
 
   // Tournament detail view - read-only version
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.tournamentHeader}>
+  <SafeAreaView style={styles.safeArea}>
+    <View style={styles.container}>
+      <View style={styles.tournamentHeader}>
+        <View style={styles.tournamentHeaderContent}>
           <Text style={styles.tournamentHeaderTitle}>{selectedTournament.name}</Text>
           <Text style={styles.tournamentHeaderDetails}>
-            Created: {selectedTournament.createdAt.toLocaleDateString()}
+            Created: {selectedTournament.createdAt ? selectedTournament.createdAt.toLocaleDateString() : 'Date unknown'}
+          </Text>
+          <Text style={styles.tournamentType}>
+            Type: {selectedTournament.type === 'roundrobin' ? 'Round Robin' : 'Elimination'}
           </Text>
         </View>
         
-        <FlatList
-          data={selectedTournament.matchups}
-          renderItem={renderMatchupItem}
-          keyExtractor={(item, index) => `match-${item.round}-${index}`}
-          contentContainerStyle={styles.matchupListContent}
-          ListHeaderComponent={
-            <Text style={styles.matchupListTitle}>
-              Tournament Matchups ({selectedTournament.matchups.length})
-            </Text>
-          }
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>No matchups found for this tournament</Text>
-          }
-        />
-        
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={styles.backToListButton}
-            onPress={handleBackToList}
-          >
-            <Text style={styles.backToListButtonText}>Back to List</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.exitButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.exitButtonText}>Home</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Results Button */}
+        <TouchableOpacity
+          style={styles.resultsButton}
+          onPress={() => setResultsModalVisible(true)}
+        >
+          <Text style={styles.resultsButtonText}>Results</Text>
+        </TouchableOpacity>
       </View>
-    </SafeAreaView>
-  );
+      
+      <FlatList
+        data={selectedTournament.matchups}
+        renderItem={({ item, index }) => {
+          // Extract player names for round robin tournaments
+          let player1Name = item.team1Name;
+          let player2Name = item.team2Name;
+          
+          if (selectedTournament.type === 'roundrobin' && item.matchNumber) {
+            if (item.player1Name && item.player2Name) {
+              player1Name = item.player1Name.replace(/_gmail_com$/, '@gmail.com');
+              player2Name = item.player2Name.replace(/_gmail_com$/, '@gmail.com');
+            }
+          }
+          
+          return (
+            <View 
+              style={[
+                styles.matchupItem,
+                item.completed && styles.completedMatchup
+              ]}
+            >
+              <Text style={styles.matchupTitle}>Round {item.round} - Match {index + 1}</Text>
+              
+              <View style={styles.teamsContainer}>
+                <Text style={styles.teamName}>{item.team1Name}</Text>
+                <Text style={styles.vsText}>vs</Text>
+                <Text style={styles.teamName}>{item.team2Name}</Text>
+              </View>
+              
+              {/* Display player names for round robin */}
+              {selectedTournament.type === 'roundrobin' && (
+                <View style={styles.playerMatchupContainer}>
+                  <Text style={styles.playerMatchupLabel}>Player Match {item.matchNumber || index + 1}</Text>
+                  <View style={styles.playerMatchupRow}>
+                    <Text 
+                      style={[
+                        styles.playerName, 
+                        item.winner === item.team1Id && styles.winnerPlayer
+                      ]}
+                    >
+                      {player1Name}
+                    </Text>
+                    <Text style={styles.vsTextSmall}>vs</Text>
+                    <Text 
+                      style={[
+                        styles.playerName, 
+                        item.winner === item.team2Id && styles.winnerPlayer
+                      ]}
+                    >
+                      {player2Name}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              
+              {item.matchupTime && (
+                <Text style={styles.matchupTimeText}>
+                  Match Time: {item.matchupTime}
+                </Text>
+              )}
+              
+              {item.completed && (
+                <Text style={styles.winnerText}>
+                  Winner: {item.winner === item.team1Id ? 
+                    (selectedTournament.type === 'roundrobin' ? player1Name : item.team1Name) : 
+                    (selectedTournament.type === 'roundrobin' ? player2Name : item.team2Name)}
+                </Text>
+              )}
+            </View>
+          );
+        }}
+        keyExtractor={(item, index) => `match-${item.round}-${index}`}
+        contentContainerStyle={styles.matchupListContent}
+        ListHeaderComponent={
+          <Text style={styles.matchupListTitle}>
+            Tournament Matchups ({selectedTournament.matchups.length})
+          </Text>
+        }
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>No matchups found for this tournament</Text>
+        }
+      />
+      
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={styles.backToListButton}
+          onPress={handleBackToList}
+        >
+          <Text style={styles.backToListButtonText}>Back to List</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.exitButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.exitButtonText}>Home</Text>
+        </TouchableOpacity>
+      </View>
+      
+      {/* Add Results Modal */}
+      <ResultsModal
+        visible={resultsModalVisible}
+        onClose={() => setResultsModalVisible(false)}
+        tournament={selectedTournament}
+      />
+    </View>
+  </SafeAreaView>
+);
 };
 
 const styles = StyleSheet.create({
@@ -343,7 +432,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#007bff',
     borderRadius: 8,
     padding: 16,
-    marginBottom: 16
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center'
   },
   tournamentHeaderTitle: {
     fontSize: 35,
@@ -465,7 +556,73 @@ const styles = StyleSheet.create({
     fontSize: 25,
     fontWeight: '500',
     textAlign: 'center'
-  }
+  },
+  tournamentHeaderContent: {
+  flex: 1,
+},
+resultsButton: {
+  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  borderRadius: 8,
+  paddingVertical: 5,
+  paddingHorizontal: 20,
+  borderWidth: 1,
+  borderColor: 'rgba(255, 255, 255, 0.3)',
+  marginLeft: 1,
+},
+resultsButtonText: {
+  color: 'white',
+  fontSize: 18,
+  fontWeight: 'bold',
+  textAlign: 'center',
+},
+tournamentType: {
+  fontSize: 16,
+  fontWeight: '500',
+  color: 'rgba(255, 255, 255, 0.9)',
+  marginTop: 8,
+  backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  paddingVertical: 4,
+  paddingHorizontal: 10,
+  borderRadius: 12,
+  alignSelf: 'flex-start',
+},
+
+playerMatchupContainer: {
+  marginTop: 8,
+  backgroundColor: '#f1f8ff',
+  padding: 10,
+  borderRadius: 6,
+  borderLeftWidth: 2,
+  borderLeftColor: '#007bff',
+},
+playerMatchupLabel: {
+  fontSize: 12,
+  fontWeight: 'bold',
+  color: '#0056b3',
+  marginBottom: 4,
+},
+playerMatchupRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+playerName: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#333',
+  flex: 1,
+},
+vsTextSmall: {
+  fontSize: 12,
+  fontWeight: 'bold',
+  color: '#dc3545',
+  marginHorizontal: 8,
+},
+winnerPlayer: {
+  color: '#28a745',
+  fontWeight: 'bold',
+}
+
 });
 
 export default UserTournamentView;

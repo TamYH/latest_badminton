@@ -11,7 +11,7 @@ import {
   Alert
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { db } from '../firebase/config';
+import { db, auth } from '../firebase/config';
 import { 
   collection, 
   getDocs, 
@@ -167,16 +167,42 @@ function UserTeamView() {
 
   // Render team item for the Teams view
   const renderTeamItem = ({ item }) => {
+    // Get current user's email and convert to the format used in your database
+    const currentUserEmail = auth.currentUser?.email || '';
+    const sanitizedEmail = currentUserEmail.replace(/[@.]/g, '_');
+    
+    // Check if the current user is a member of this team
+    const isUserTeam = item.memberIds && item.memberIds.includes(sanitizedEmail);
+    
     return (
-      <View style={styles.teamItem}>
+      <View style={[
+        styles.teamItem,
+        isUserTeam && styles.userTeamItem  // Apply special styling if this is user's team
+      ]}>
         <Text style={styles.teamName}>{item.name}</Text>
-        <Text style={styles.teamMemberCount}>
+        <Text style={[
+          styles.teamMemberCount,
+          isUserTeam && styles.userTeamText
+        ]}>
           {item.members.length} member{item.members.length !== 1 ? 's' : ''}
+          {isUserTeam && ' (Your Team)'}
         </Text>
         
         {item.members.map((member) => (
-          <View key={member.id} style={styles.teamMemberItem}>
-            <Text style={styles.teamMemberText}>{member.email}</Text>
+          <View 
+            key={member.id} 
+            style={[
+              styles.teamMemberItem,
+              member.id === sanitizedEmail && styles.currentUserItem
+            ]}
+          >
+            <Text style={[
+              styles.teamMemberText,
+              member.id === sanitizedEmail && styles.currentUserText
+            ]}>
+              {member.email}
+              {member.id === sanitizedEmail && ' (You)'}
+            </Text>
           </View>
         ))}
       </View>
@@ -376,6 +402,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
+  },
+  userTeamItem: {
+    borderWidth: 2,
+    borderColor: '#2196F3',
+    backgroundColor: '#e8f5e9',
   },
   teamName: {
     fontSize: 18,
